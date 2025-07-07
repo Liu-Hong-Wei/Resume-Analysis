@@ -1,0 +1,40 @@
+# node_modules
+node_modules/
+
+# logs
+logs/
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+
+# build outputs
+dist/
+build/
+
+# TypeScript
+*.tsbuildinfo
+
+# dotenv files
+.env
+.env.*
+
+# pnpm store (optional)
+.pnpm-store/
+
+# cache
+.cache/
+turbo/
+
+# Vite
+*.local
+vite.config.ts
+
+# Webpack cache
+webpack-cache/
