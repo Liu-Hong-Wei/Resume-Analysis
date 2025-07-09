@@ -7,7 +7,7 @@ import { COZE_CONFIG } from "../config/index.js";
  * @returns {Object} 请求体对象
  */
 function buildCozeRequestBody(resumeText, stream = false) {
-  // 限制文本长度
+  // 限制文本长度 - 根据Coze文档，支持更大的文本长度
   const truncatedText =
     resumeText.length > COZE_CONFIG.MAX_TEXT_LENGTH
       ? resumeText.substring(0, COZE_CONFIG.MAX_TEXT_LENGTH) + "..."
@@ -36,11 +36,11 @@ ${truncatedText}`,
 
 /**
  * 构建Coze API请求体（文件上传模式）
- * @param {string} pdfBase64 - Base64编码的PDF文件
+ * @param {string} fileId - 文件ID
  * @param {boolean} stream - 是否使用流式响应
  * @returns {Object} 请求体对象
  */
-function buildCozeRequestBodyWithFile(pdfBase64, stream = false) {
+function buildCozeRequestBodyWithFile(fileId, stream = false) {
   return {
     bot_id: COZE_CONFIG.BOT_ID,
     messages: [
@@ -53,10 +53,7 @@ function buildCozeRequestBodyWithFile(pdfBase64, stream = false) {
           },
           {
             type: "file",
-            file: {
-              type: "application/pdf",
-              data: pdfBase64,
-            },
+            file_id: fileId,
           },
         ],
       },
@@ -75,13 +72,63 @@ async function handleCozeError(response) {
   const errorText = await response.text();
   let errorMessage = `Coze API请求失败: ${response.status} ${response.statusText}`;
 
+  console.log(`Coze API错误响应状态: ${response.status}`);
+  console.log(
+    `Coze API错误响应头:`,
+    Object.fromEntries(response.headers.entries())
+  );
+  console.log(`Coze API错误响应内容前200字符:`, errorText.substring(0, 200));
+
+  // 检查是否是HTML响应（通常表示URL错误或服务器错误）
+  if (
+    errorText.trim().toLowerCase().startsWith("<!doctype") ||
+    errorText.trim().toLowerCase().startsWith("<html")
+  ) {
+    errorMessage += " (服务器返回HTML页面，可能是API URL错误或服务器问题)";
+    console.error(
+      "收到HTML响应，可能是API配置错误:",
+      errorText.substring(0, 500)
+    );
+    return errorMessage;
+  }
+
   try {
     const errorData = JSON.parse(errorText);
     if (errorData.error) {
       errorMessage += ` - ${errorData.error.message || errorData.error}`;
+    } else if (errorData.message) {
+      errorMessage += ` - ${errorData.message}`;
     }
   } catch (e) {
-    errorMessage += ` - ${errorText}`;
+    console.error("解析错误响应JSON失败:", e);
+    errorMessage += ` - 响应内容: ${errorText.substring(0, 200)}`;
+  }
+
+  // 根据HTTP状态码添加更详细的错误信息
+  switch (response.status) {
+    case 400:
+      errorMessage += " (请求参数错误)";
+      break;
+    case 401:
+      errorMessage += " (认证失败，请检查API密钥)";
+      break;
+    case 403:
+      errorMessage += " (权限不足)";
+      break;
+    case 404:
+      errorMessage += " (资源不存在，请检查API URL)";
+      break;
+    case 429:
+      errorMessage += " (请求频率超限)";
+      break;
+    case 500:
+      errorMessage += " (服务器内部错误)";
+      break;
+    case 502:
+    case 503:
+    case 504:
+      errorMessage += " (服务器暂时不可用)";
+      break;
   }
 
   return errorMessage;
@@ -104,6 +151,78 @@ function validateCozeResponse(data) {
   const choice = data.choices[0];
   if (!choice.message || !choice.message.content) {
     throw new Error("Coze API响应格式错误：缺少message.content");
+  }
+}
+
+/**
+ * 上传文件到 Coze API
+ * @param {string} fileBase64 - Base64编码的文件内容
+ * @param {string} fileName - 文件名
+ * @param {string} mimeType - 文件MIME类型
+ * @returns {Promise<string>} 文件ID
+ */
+async function uploadFileToCoze(
+  fileBase64,
+  fileName,
+  mimeType = "application/pdf"
+) {
+  try {
+    const uploadUrl = "https://www.coze.cn/open/api/files/upload";
+
+    console.log("开始上传文件到Coze:", {
+      fileName,
+      mimeType,
+      fileSize: Math.round(fileBase64.length * 0.75), // Base64解码后的大小
+      uploadUrl,
+    });
+
+    const requestBody = {
+      file: fileBase64,
+      filename: fileName,
+      type: mimeType,
+    };
+
+    console.log("上传请求体结构:", {
+      hasFile: !!requestBody.file,
+      fileLength: requestBody.file?.length,
+      filename: requestBody.filename,
+      type: requestBody.type,
+    });
+
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${COZE_CONFIG.API_KEY}`,
+        "User-Agent": "Resume-Analysis-API/1.0",
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log("文件上传响应状态:", response.status, response.statusText);
+
+    if (!response.ok) {
+      const errorMessage = await handleCozeError(response);
+      throw new Error(errorMessage);
+    }
+
+    const data = await response.json();
+    console.log("文件上传成功响应:", data);
+
+    if (!data.file_id) {
+      console.error("文件上传响应缺少file_id:", data);
+      throw new Error("文件上传失败：未返回文件ID");
+    }
+
+    console.log("文件上传成功:", {
+      file_id: data.file_id,
+      filename: fileName,
+    });
+
+    return data.file_id;
+  } catch (error) {
+    console.error("文件上传详细错误:", error);
+    throw new Error(`文件上传失败: ${error.message}`);
   }
 }
 
@@ -133,6 +252,7 @@ export async function analyzeResumeWithCoze(resumeText) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${COZE_CONFIG.API_KEY}`,
         "User-Agent": "Resume-Analysis-API/1.0",
+        Accept: "application/json",
       },
       body: JSON.stringify(requestBody),
     });
@@ -160,19 +280,27 @@ export async function analyzeResumeWithCoze(resumeText) {
 /**
  * 调用Coze API进行简历分析（非流式）- 文件上传模式
  * @param {string} pdfBase64 - Base64编码的PDF文件
+ * @param {string} fileName - 文件名
  * @returns {Promise<string>} 分析结果
  */
-export async function analyzeResumeWithCozeFile(pdfBase64) {
+export async function analyzeResumeWithCozeFile(
+  pdfBase64,
+  fileName = "resume.pdf"
+) {
   try {
     // 验证输入参数
     if (!pdfBase64 || typeof pdfBase64 !== "string") {
       throw new Error("PDF文件内容无效");
     }
 
-    const requestBody = buildCozeRequestBodyWithFile(pdfBase64, false);
+    // 先上传文件获取文件ID
+    const fileId = await uploadFileToCoze(pdfBase64, fileName);
+
+    const requestBody = buildCozeRequestBodyWithFile(fileId, false);
 
     console.log("发送Coze API请求（文件模式）:", {
       bot_id: COZE_CONFIG.BOT_ID,
+      file_id: fileId,
       file_size: Math.round(pdfBase64.length * 0.75), // Base64编码会增加约33%的大小
       max_tokens: requestBody.max_tokens,
     });
@@ -183,6 +311,7 @@ export async function analyzeResumeWithCozeFile(pdfBase64) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${COZE_CONFIG.API_KEY}`,
         "User-Agent": "Resume-Analysis-API/1.0",
+        Accept: "application/json",
       },
       body: JSON.stringify(requestBody),
     });
@@ -234,6 +363,7 @@ export async function analyzeResumeWithCozeStream(resumeText, res) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${COZE_CONFIG.API_KEY}`,
         "User-Agent": "Resume-Analysis-API/1.0",
+        Accept: "text/event-stream",
       },
       body: JSON.stringify(requestBody),
     });
@@ -242,6 +372,15 @@ export async function analyzeResumeWithCozeStream(resumeText, res) {
       const errorMessage = await handleCozeError(response);
       throw new Error(errorMessage);
     }
+
+    // 设置流式响应头
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Cache-Control",
+    });
 
     // 处理流式响应
     const reader = response.body.getReader();
@@ -298,17 +437,25 @@ export async function analyzeResumeWithCozeStream(resumeText, res) {
  * @param {Response} res - Express响应对象
  * @returns {Promise<void>}
  */
-export async function analyzeResumeWithCozeFileStream(pdfBase64, res) {
+export async function analyzeResumeWithCozeFileStream(
+  pdfBase64,
+  res,
+  fileName = "resume.pdf"
+) {
   try {
     // 验证输入参数
     if (!pdfBase64 || typeof pdfBase64 !== "string") {
       throw new Error("PDF文件内容无效");
     }
 
-    const requestBody = buildCozeRequestBodyWithFile(pdfBase64, true);
+    // 先上传文件获取文件ID
+    const fileId = await uploadFileToCoze(pdfBase64, fileName);
+
+    const requestBody = buildCozeRequestBodyWithFile(fileId, true);
 
     console.log("发送Coze API流式请求（文件模式）:", {
       bot_id: COZE_CONFIG.BOT_ID,
+      file_id: fileId,
       file_size: Math.round(pdfBase64.length * 0.75),
       max_tokens: requestBody.max_tokens,
     });
@@ -319,6 +466,7 @@ export async function analyzeResumeWithCozeFileStream(pdfBase64, res) {
         "Content-Type": "application/json",
         Authorization: `Bearer ${COZE_CONFIG.API_KEY}`,
         "User-Agent": "Resume-Analysis-API/1.0",
+        Accept: "text/event-stream",
       },
       body: JSON.stringify(requestBody),
     });
@@ -327,6 +475,15 @@ export async function analyzeResumeWithCozeFileStream(pdfBase64, res) {
       const errorMessage = await handleCozeError(response);
       throw new Error(errorMessage);
     }
+
+    // 设置流式响应头
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Cache-Control",
+    });
 
     // 处理流式响应
     const reader = response.body.getReader();

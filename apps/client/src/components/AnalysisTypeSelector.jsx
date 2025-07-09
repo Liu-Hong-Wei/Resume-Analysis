@@ -6,7 +6,7 @@ const AnalysisTypeSelector = ({ analysisType, onAnalysisTypeChange }) => {
     <div className="card bg-base-100 shadow-xl">
       <div className="card-body">
         <h2 className="card-title">分析类型</h2>
-        <div className="form-control">
+        <div className="form-control flex flex-col gap-1 xl:text-lg text-md">
           {ANALYSIS_TYPES.map((type) => (
             <label key={type.id} className="label cursor-pointer">
               <span className="label-text flex items-center gap-2">

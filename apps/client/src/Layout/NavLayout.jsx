@@ -18,7 +18,8 @@ function NavLayout() {
 
   const navItems = [
     { path: "/", label: "首页", icon: "🏠" },
-    { path: "/analysis", label: "简历分析", icon: "📊" },
+    { path: "/analysis", label: "简历分析", icon: "��" },
+    { path: "/chat", label: "AI对话", icon: "💬" },
     { path: "/about", label: "关于我们", icon: "ℹ️" },
   ];
 
@@ -178,8 +179,14 @@ function NavLayout() {
       </div>
 
       {/* 主要内容区域 */}
-      <main className="pt-20 min-h-screen">
-        <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <main className="pt-20 h-screen">
+        <div
+          className={`mx-auto h-full w-full ${
+            location.pathname === "/analysis"
+              ? ""
+              : "px-4 py-8 max-w-7xl container "
+          }`}
+        >
           <Outlet />
         </div>
       </main>

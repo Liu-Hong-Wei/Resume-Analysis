@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useChat } from "./useChat";
 
 // API配置
 const API_BASE_URL = "http://localhost:3001/api";
@@ -8,7 +9,7 @@ export const ANALYSIS_TYPES = [
   {
     id: "comprehensive",
     title: "全面分析",
-    description: "对简历进行全方位分析，包括技能匹配、经验评估等",
+    description: "对简历进行全方位分析，包括技能匹配等",
     icon: "🔍",
   },
   {
@@ -46,31 +47,22 @@ export const useResumeAnalysis = () => {
   const [analysisType, setAnalysisType] = useState("comprehensive");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [resumeText, setResumeText] = useState("");
-  const [conversationHistory, setConversationHistory] = useState([]);
-  const [currentMessage, setCurrentMessage] = useState("");
-  const [isSending, setIsSending] = useState(false);
   const [initialAnalysis, setInitialAnalysis] = useState(null);
-  const [error, setError] = useState(null);
 
-  const messagesEndRef = useRef(null);
-
-  // 自动滚动到底部
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [conversationHistory]);
+  // 使用通用聊天hook
+  const chatHook = useChat({
+    apiEndpoint: "/chat-analysis",
+    suggestedQuestions: SUGGESTED_QUESTIONS,
+    contextData: resumeText, // 将简历文本作为上下文数据
+  });
 
   // 文件处理
   const handleFileChange = (event) => {
     const file = event.target.files[0];
     setSelectedFile(file);
     setResumeText("");
-    setConversationHistory([]);
     setInitialAnalysis(null);
-    setError(null);
+    chatHook.clearHistory();
   };
 
   // 简历分析API调用
@@ -78,7 +70,7 @@ export const useResumeAnalysis = () => {
     if (!selectedFile) return;
 
     setIsAnalyzing(true);
-    setError(null);
+    chatHook.setError(null);
 
     try {
       const formData = new FormData();
@@ -106,9 +98,7 @@ export const useResumeAnalysis = () => {
         setInitialAnalysis(parsedResult);
 
         // 添加初始分析消息到对话历史
-        const initialMessage = {
-          role: "assistant",
-          content: `📊 **简历分析完成！**
+        const initialMessage = `📊 **简历分析完成！**
 
 **整体评分**: ${parsedResult.overallScore || "N/A"} / 100
 **技能匹配度**: ${parsedResult.skillMatch || "N/A"}
@@ -120,78 +110,17 @@ ${parsedResult.analysis || "分析内容加载中..."}
 **优化建议**:
 ${parsedResult.suggestions ? parsedResult.suggestions.map((s) => `• ${s}`).join("\n") : "暂无具体建议"}
 
-您可以继续向我提问关于简历的任何问题，我会为您提供更详细的分析和建议！`,
-        };
+您可以继续向我提问关于简历的任何问题，我会为您提供更详细的分析和建议！`;
 
-        setConversationHistory([initialMessage]);
+        chatHook.addSystemMessage(initialMessage);
       } else {
         throw new Error(data.error || "分析失败");
       }
     } catch (error) {
       console.error("分析错误:", error);
-      setError("分析失败: " + error.message);
+      chatHook.setError("分析失败: " + error.message);
     } finally {
       setIsAnalyzing(false);
-    }
-  };
-
-  // 发送消息API调用
-  const sendMessage = async () => {
-    if (!currentMessage.trim() || !resumeText) return;
-
-    const userMessage = {
-      role: "user",
-      content: currentMessage,
-    };
-
-    setConversationHistory((prev) => [...prev, userMessage]);
-    setCurrentMessage("");
-    setIsSending(true);
-    setError(null);
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/chat-analysis`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: currentMessage,
-          resumeText: resumeText,
-          conversationHistory: conversationHistory,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const assistantMessage = {
-          role: "assistant",
-          content: data.response,
-        };
-
-        setConversationHistory((prev) => [...prev, assistantMessage]);
-      } else {
-        throw new Error(data.error || "发送失败");
-      }
-    } catch (error) {
-      console.error("发送错误:", error);
-      const errorMessage = {
-        role: "assistant",
-        content: `❌ 抱歉，发送消息时出现错误: ${error.message}`,
-      };
-      setConversationHistory((prev) => [...prev, errorMessage]);
-      setError("发送失败: " + error.message);
-    } finally {
-      setIsSending(false);
-    }
-  };
-
-  // 键盘事件处理
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
     }
   };
 
@@ -199,10 +128,8 @@ ${parsedResult.suggestions ? parsedResult.suggestions.map((s) => `• ${s}`).joi
   const resetAnalysis = () => {
     setSelectedFile(null);
     setResumeText("");
-    setConversationHistory([]);
     setInitialAnalysis(null);
-    setCurrentMessage("");
-    setError(null);
+    chatHook.clearHistory();
   };
 
   return {
@@ -211,21 +138,14 @@ ${parsedResult.suggestions ? parsedResult.suggestions.map((s) => `• ${s}`).joi
     analysisType,
     isAnalyzing,
     resumeText,
-    conversationHistory,
-    currentMessage,
-    isSending,
     initialAnalysis,
-    error,
-    messagesEndRef,
+    ...chatHook, // 展开聊天hook的所有状态和方法
 
     // 方法
     setSelectedFile,
     setAnalysisType,
-    setCurrentMessage,
     handleFileChange,
     analyzeResume,
-    sendMessage,
-    handleKeyPress,
     resetAnalysis,
   };
 };

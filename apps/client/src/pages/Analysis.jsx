@@ -25,7 +25,8 @@ function Analysis() {
     handleFileChange,
     analyzeResume,
     sendMessage,
-    handleKeyPress,
+    handleKeyDown,
+    setError,
   } = useResumeAnalysis();
 
   // 处理快捷问题点击
@@ -36,28 +37,28 @@ function Analysis() {
   // 处理错误关闭
   const handleErrorClose = () => {
     // 这里可以添加清除错误的逻辑
+    setError(null);
   };
 
   return (
-    <div className="space-y-8">
+    <div className="flex flex-col min-h-[90vh] mx-auto pt-6 px-6">
       {/* 页面标题 */}
-      <div className="hero bg-base-200">
+      <div className="hero bg-base-200 basis-1/12">
         <div className="hero-content text-center">
           <div className="max-w-md">
             <h1 className="text-5xl font-bold">AI简历分析</h1>
-            <p className="py-6">
-              上传您的简历，与AI助手进行智能对话，获得专业的分析和优化建议
-            </p>
+            <p className="py-2">上传您的简历，与AI助手进行智能对话</p>
           </div>
         </div>
       </div>
 
-      {/* 错误提示 */}
-      <ErrorAlert error={error} onClose={handleErrorClose} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* 页面内容 */}
+      <div className="flex xl:flex-row flex-col gap-4 basis-11/12 flex-1">
         {/* 左侧：上传和分析设置 */}
-        <div className="space-y-6">
+        <div className="xl:w-1/4 space-y-6">
+          {/* 错误提示 */}
+          <ErrorAlert error={error} onClose={handleErrorClose} />
+
           {/* 文件上传区域 */}
           <ResumeUpload
             selectedFile={selectedFile}
@@ -70,7 +71,7 @@ function Analysis() {
             onAnalysisTypeChange={setAnalysisType}
           />
 
-          {/* 开始分析按钮 */}
+          {/* 开始分析按钮 TODO: 不需要这个按钮 */}
           <button
             onClick={analyzeResume}
             disabled={!selectedFile || isAnalyzing}
@@ -91,17 +92,20 @@ function Analysis() {
         </div>
 
         {/* 右侧：对话栏 */}
-        <ChatInterface
-          resumeText={resumeText}
-          conversationHistory={conversationHistory}
-          currentMessage={currentMessage}
-          isSending={isSending}
-          messagesEndRef={messagesEndRef}
-          onMessageChange={(e) => setCurrentMessage(e.target.value)}
-          onSendMessage={sendMessage}
-          onKeyPress={handleKeyPress}
-          onSuggestedQuestionClick={handleSuggestedQuestionClick}
-        />
+        <div className="xl:w-3/4">
+          <ChatInterface
+            resumeText={resumeText}
+            conversationHistory={conversationHistory}
+            currentMessage={currentMessage}
+            isSending={isSending}
+            messagesEndRef={messagesEndRef}
+            onMessageChange={(e) => setCurrentMessage(e.target.value)}
+            onSendMessage={sendMessage}
+            onKeyDown={handleKeyDown}
+            onSuggestedQuestionClick={handleSuggestedQuestionClick}
+            className="h-full"
+          />
+        </div>
       </div>
     </div>
   );

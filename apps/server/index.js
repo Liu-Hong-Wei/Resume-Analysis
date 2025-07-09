@@ -11,6 +11,7 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 // 导入路由
 import healthRouter from "./routes/health.js";
 import resumeRouter from "./routes/resume-evaluate.js";
+import chatRouter from "./routes/chat.js";
 
 const app = express();
 
@@ -22,6 +23,7 @@ app.use(express.urlencoded({ extended: true }));
 // 注册路由
 app.use("/health", healthRouter);
 app.use("/api", resumeRouter);
+app.use("/api", chatRouter);
 
 // 错误处理中间件
 app.use(handleUploadError);
@@ -40,6 +42,7 @@ app.listen(SERVER_CONFIG.PORT, () => {
   console.log(
     `简历分析API (流式): http://localhost:${SERVER_CONFIG.PORT}/api/analyze-resume-stream`
   );
+  console.log(`通用聊天API: http://localhost:${SERVER_CONFIG.PORT}/api/chat`);
 
   // 验证配置
   try {
