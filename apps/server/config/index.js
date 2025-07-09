@@ -21,11 +21,21 @@ export const COZE_FILE_LIMITS = {
   SUPPORTED_TYPES: ["application/pdf", "image/jpeg", "image/png", "image/gif"],
 };
 
+// 分析类型常量
+export const ANALYSIS_TYPES = {
+  EVALUATE: "evaluate", // 简历评估
+  GENERATE: "generate", // 简历生成
+  MOCK: "mock", // 模拟
+};
+
 // Coze API配置
 export const COZE_CONFIG = {
   API_KEY: process.env.COZE_API_KEY,
   BOT_ID: process.env.COZE_BOT_ID,
-  API_URL: "https://www.coze.cn/open/api/chat/completions",
+  BASE_URL: "https://api.coze.cn",
+  API_URL: "https://api.coze.cn/v1/conversation/create",
+  CHAT_URL: "https://api.coze.cn/v3/chat",
+  STREAM_URL: "https://api.coze.cn/v3/chat",
   MAX_TEXT_LENGTH: 8000, // 根据Coze文档，支持更大的文本长度
   DEFAULT_PARAMS: {
     temperature: 0.7,

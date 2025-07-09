@@ -1,104 +1,47 @@
 import express from "express";
-import { upload, handleUploadError } from "../middleware/upload.js";
-import { ResumeAnalysisService } from "../services/resumeAnalysisService.js";
-import { FileUtils } from "../utils/fileUtils.js";
-import { ErrorUtils } from "../utils/errorUtils.js";
+import { upload } from "../utils/uploadConfig.js";
+import { createAnalysisHandler } from "../services/analysisService.js";
+import { ANALYSIS_TYPES } from "../config/index.js";
 
 const router = express.Router();
+const handler = createAnalysisHandler(ANALYSIS_TYPES.EVALUATE);
+
+// 简化的路由，实际功能由统一路由处理
+// 这些路由主要用于向后兼容
 
 /**
- * 简历分析API端点（非流式）- 直接上传PDF文件
+ * 简历评估API端点（非流式）- 直接上传PDF文件
  * POST /api/analyze-resume
  */
 router.post(
   "/analyze-resume",
-  upload.single("resume"),
-  handleUploadError,
-  async (req, res) => {
-    let filePath = null;
-
-    try {
-      // 验证上传的文件
-      const validation = await ResumeAnalysisService.validateUploadedFile(req);
-      if (!validation.isValid) {
-        return res.status(validation.error.status).json(
-          ErrorUtils.createErrorResponse(
-            validation.error.status,
-            validation.error.message
-          )
-        );
-      }
-      filePath = validation.filePath;
-
-      // 分析简历
-      const result = await ResumeAnalysisService.analyzeResume(
-        filePath,
-        req.file.originalname,
-        req.file.size
-      );
-
-      // 发送响应后再清理文件
-      res.json(result);
-
-      // 延迟清理文件，确保响应已发送
-      FileUtils.cleanupFileWithDelay(filePath);
-    } catch (error) {
-      ErrorUtils.handleAnalysisError(error, res, filePath, FileUtils.cleanupFile);
-    }
-  }
+  upload.single("file"),
+  handler.handleFileAnalysis
 );
 
 /**
- * 简历分析API端点（流式响应）- 直接上传PDF文件
+ * 简历评估API端点（流式响应）- 直接上传PDF文件
  * POST /api/analyze-resume-stream
  */
 router.post(
   "/analyze-resume-stream",
-  upload.single("resume"),
-  handleUploadError,
-  async (req, res) => {
-    let filePath = null;
-
-    try {
-      // 验证上传的文件
-      const validation = await ResumeAnalysisService.validateUploadedFile(req);
-      if (!validation.isValid) {
-        return res.status(validation.error.status).json(
-          ErrorUtils.createErrorResponse(
-            validation.error.status,
-            validation.error.message
-          )
-        );
-      }
-      filePath = validation.filePath;
-
-      // 设置流式响应头
-      res.setHeader("Content-Type", "text/plain; charset=utf-8");
-      res.setHeader("Cache-Control", "no-cache");
-      res.setHeader("Connection", "keep-alive");
-
-      // 流式分析简历
-      await ResumeAnalysisService.analyzeResumeStream(
-        filePath,
-        res,
-        req.file.originalname
-      );
-
-      // 流式响应结束后清理文件
-      res.on("finish", () => {
-        FileUtils.cleanupFile(filePath);
-      });
-
-      res.end();
-    } catch (error) {
-      ErrorUtils.handleStreamAnalysisError(
-        error,
-        res,
-        filePath,
-        FileUtils.cleanupFile
-      );
-    }
-  }
+  upload.single("file"),
+  handler.handleFileAnalysisStream
 );
+
+/**
+ * 简历评估API端点（流式响应）- 只有用户提问，没有文件上传
+ * POST /api/analyze-resume-question-stream
+ */
+router.post(
+  "/analyze-resume-question-stream",
+  handler.handleQuestionAnalysisStream
+);
+
+/**
+ * 简历评估API端点（纯文本模式）- 只有用户提问，没有文件上传
+ * POST /api/analyze-resume-question
+ */
+router.post("/analyze-resume-question", handler.handleQuestionAnalysis);
 
 export default router;

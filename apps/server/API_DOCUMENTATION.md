@@ -1,257 +1,407 @@
-# 简历分析API文档
+# 简历分析服务 API 文档
 
 ## 概述
 
-这是一个基于Express.js的简历分析API，支持PDF文件上传并通过Coze大模型API进行智能评估。
+这是一个基于 Express.js 的简历分析服务，提供简历评估、简历生成和模拟面试功能。服务集成了 Coze API 进行智能分析。
 
-## 环境配置
+**基础URL**: `http://localhost:3001`
 
-### 1. 环境变量设置
+## 服务器信息
 
-创建 `.env` 文件并配置以下变量：
+- **端口**: 3001 (可通过环境变量 PORT 配置)
+- **文件上传限制**: 25MB
+- **支持的文件类型**: PDF, JPEG, PNG, GIF
+- **流式响应**: 支持 Server-Sent Events (SSE)
 
-```env
-PORT=3001
-COZE_API_KEY=your_coze_api_key_here
-COZE_BOT_ID=your_coze_bot_id_here
-NODE_ENV=development
-```
+## 分析类型
 
-### 2. 获取Coze API密钥
+服务支持三种分析类型：
 
-1. 访问 [Coze开放平台](https://www.coze.cn/open)
-2. 注册并创建应用
-3. 获取API密钥和Bot ID
+- `evaluate`: 简历评估 - 分析简历内容，提供改进建议
+- `generate`: 简历生成 - 根据用户需求生成简历内容
+- `mock`: 模拟面试 - 基于简历进行模拟面试
 
-## API端点
+## API 端点
 
 ### 1. 健康检查
 
-**GET** `/health`
+#### GET /health
 
-检查服务器运行状态
+检查服务器运行状态。
 
-**响应示例：**
+**请求**:
+
+```http
+GET /health
+```
+
+**响应**:
 
 ```json
 {
   "status": "ok",
-  "message": "服务器运行正常"
+  "message": "服务器运行正常",
+  "timestamp": "2024-01-01T00:00:00.000Z"
 }
 ```
 
-### 2. 简历分析（非流式）
+### 2. 获取支持的分析类型
 
-**POST** `/api/analyze-resume`
+#### GET /api/analysis-types
 
-上传PDF简历文件并获取分析结果
+获取所有支持的分析类型。
 
-**请求参数：**
+**请求**:
 
-- `resume`: PDF文件（multipart/form-data）
-
-**请求示例：**
-
-```bash
-curl -X POST http://localhost:3001/api/analyze-resume \
-  -F "resume=@path/to/your/resume.pdf"
+```http
+GET /api/analysis-types
 ```
 
-**成功响应：**
+**响应**:
 
 ```json
 {
   "success": true,
-  "message": "简历分析完成",
-  "data": {
-    "originalText": "简历文本预览...",
-    "analysis": "Coze AI分析结果...",
-    "fileName": "resume.pdf",
-    "fileSize": 1024000,
-    "uploadTime": "2024-01-01T12:00:00.000Z"
+  "analysis_types": {
+    "evaluate": "简历评估",
+    "generate": "简历生成",
+    "mock": "模拟面试"
   }
 }
 ```
 
-**错误响应：**
+### 3. 通用分析 API
+
+#### POST /api/analyze
+
+通用分析端点，通过参数指定分析类型。
+
+**请求参数**:
+
+- `analysis_type` (必需): 分析类型 - `evaluate` | `generate` | `mock`
+- `question` (可选): 用户问题
+- `file` (可选): 上传的PDF文件 (multipart/form-data)
+
+**请求示例**:
+
+```bash
+# 带文件上传
+curl -X POST http://localhost:3001/api/analyze \
+  -F "analysis_type=evaluate" \
+  -F "question=请分析我的简历" \
+  -F "file=@resume.pdf"
+
+# 仅文本分析
+curl -X POST http://localhost:3001/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "analysis_type": "evaluate",
+    "question": "请分析我的简历"
+  }'
+```
+
+**响应**:
 
 ```json
 {
-  "success": false,
-  "message": "错误信息",
-  "error": "详细错误描述"
+  "success": true,
+  "analysis_type": "evaluate",
+  "result": "分析结果内容...",
+  "timestamp": "2024-01-01T00:00:00.000Z"
 }
 ```
 
-### 3. 简历分析（流式响应）
+#### POST /api/analyze-stream
 
-**POST** `/api/analyze-resume-stream`
+通用分析端点（流式响应）。
 
-上传PDF简历文件并获取流式分析结果
+**请求参数**: 同 `/api/analyze`
 
-**请求参数：**
+**响应格式**: Server-Sent Events (SSE)
 
-- `resume`: PDF文件（multipart/form-data）
+```
+data: {"type": "start", "analysis_type": "evaluate"}
 
-**请求示例：**
+data: {"type": "content", "content": "分析内容片段..."}
+
+data: {"type": "end", "success": true}
+```
+
+### 4. 简历评估 API
+
+#### POST /api/evaluate-resume
+
+简历评估（非流式）- 上传PDF文件。
+
+**请求**:
+
+```http
+POST /api/evaluate-resume
+Content-Type: multipart/form-data
+
+file: [PDF文件]
+question: [可选问题]
+```
+
+**响应**:
+
+```json
+{
+  "success": true,
+  "analysis_type": "evaluate",
+  "result": "简历评估结果...",
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+#### POST /api/evaluate-resume-stream
+
+简历评估（流式响应）- 上传PDF文件。
+
+**请求**: 同 `/api/evaluate-resume`
+
+**响应**: SSE 格式
+
+#### POST /api/evaluate-resume-question
+
+简历评估（纯文本模式）- 仅用户提问。
+
+**请求**:
+
+```http
+POST /api/evaluate-resume-question
+Content-Type: application/json
+
+{
+  "question": "请分析我的简历"
+}
+```
+
+#### POST /api/evaluate-resume-question-stream
+
+简历评估（流式响应）- 仅用户提问。
+
+**请求**: 同 `/api/evaluate-resume-question`
+
+**响应**: SSE 格式
+
+### 5. 简历生成 API
+
+#### POST /api/generate-resume
+
+简历生成（非流式）- 上传PDF文件。
+
+**请求**:
+
+```http
+POST /api/generate-resume
+Content-Type: multipart/form-data
+
+file: [PDF文件]
+question: [可选问题]
+```
+
+#### POST /api/generate-resume-stream
+
+简历生成（流式响应）- 上传PDF文件。
+
+#### POST /api/generate-resume-question
+
+简历生成（纯文本模式）- 仅用户提问。
+
+#### POST /api/generate-resume-question-stream
+
+简历生成（流式响应）- 仅用户提问。
+
+### 6. 模拟面试 API
+
+#### POST /api/mock-interview
+
+模拟面试（非流式）- 上传PDF文件。
+
+**请求**:
+
+```http
+POST /api/mock-interview
+Content-Type: multipart/form-data
+
+file: [PDF文件]
+question: [可选问题]
+```
+
+#### POST /api/mock-interview-stream
+
+模拟面试（流式响应）- 上传PDF文件。
+
+#### POST /api/mock-interview-question
+
+模拟面试（纯文本模式）- 仅用户提问。
+
+#### POST /api/mock-interview-question-stream
+
+模拟面试（流式响应）- 仅用户提问。
+
+### 7. 向后兼容 API
+
+以下端点主要用于向后兼容，功能与统一分析API相同：
+
+#### 简历评估兼容端点
+
+- `POST /api/analyze-resume` - 简历评估（非流式）
+- `POST /api/analyze-resume-stream` - 简历评估（流式）
+- `POST /api/analyze-resume-question` - 简历评估（纯文本）
+- `POST /api/analyze-resume-question-stream` - 简历评估（流式纯文本）
+
+#### 简历生成兼容端点
+
+- `POST /api/resume-generate` - 简历生成（非流式）
+- `POST /api/resume-generate-stream` - 简历生成（流式）
+- `POST /api/resume-generate-question` - 简历生成（纯文本）
+- `POST /api/resume-generate-question-stream` - 简历生成（流式纯文本）
+
+#### 模拟面试兼容端点
+
+- `POST /api/mock-interview` - 模拟面试（非流式）
+- `POST /api/mock-interview-stream` - 模拟面试（流式）
+- `POST /api/mock-interview-question` - 模拟面试（纯文本）
+- `POST /api/mock-interview-question-stream` - 模拟面试（流式纯文本）
+
+## 错误处理
+
+### 错误响应格式
+
+```json
+{
+  "error": "错误描述",
+  "timestamp": "2024-01-01T00:00:00.000Z"
+}
+```
+
+### 常见错误码
+
+- `400 Bad Request`: 请求参数错误
+- `413 Payload Too Large`: 文件大小超限
+- `415 Unsupported Media Type`: 不支持的文件类型
+- `500 Internal Server Error`: 服务器内部错误
+
+### 错误示例
+
+```json
+{
+  "error": "请提供有效的分析类型",
+  "valid_types": ["evaluate", "generate", "mock"]
+}
+```
+
+## 流式响应格式
+
+流式响应使用 Server-Sent Events (SSE) 格式：
+
+```
+data: {"type": "start", "analysis_type": "evaluate"}
+
+data: {"type": "content", "content": "分析内容片段..."}
+
+data: {"type": "content", "content": "更多内容..."}
+
+data: {"type": "end", "success": true}
+```
+
+### 事件类型
+
+- `start`: 开始分析
+- `content`: 内容片段
+- `end`: 分析结束
+- `error`: 错误信息
+
+## 环境变量配置
+
+服务需要以下环境变量：
 
 ```bash
-curl -X POST http://localhost:3001/api/analyze-resume-stream \
-  -F "resume=@path/to/your/resume.pdf"
+# Coze API 配置
+COZE_API_KEY=your_coze_api_key
+COZE_BOT_ID=your_coze_bot_id
+
+# 服务器配置（可选）
+PORT=3001
 ```
 
-**流式响应格式：**
+## 使用示例
 
+### JavaScript 客户端示例
+
+```javascript
+// 非流式请求
+async function analyzeResume(file, question) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("question", question);
+
+  const response = await fetch("/api/analyze", {
+    method: "POST",
+    body: formData,
+  });
+
+  return await response.json();
+}
+
+// 流式请求
+function analyzeResumeStream(file, question, onData) {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("question", question);
+
+  const eventSource = new EventSource("/api/analyze-stream");
+
+  eventSource.onmessage = (event) => {
+    const data = JSON.parse(event.data);
+    onData(data);
+
+    if (data.type === "end") {
+      eventSource.close();
+    }
+  };
+}
 ```
-data: {"choices":[{"delta":{"content":"分析内容..."},"finish_reason":null}]}
 
-data: {"choices":[{"delta":{"content":"继续分析..."},"finish_reason":null}]}
-
-data: [DONE]
-```
-
-## 功能特性
-
-### 1. 文件处理
-
-- 支持PDF格式文件
-- 文件大小限制：10MB
-- 自动文件清理
-- 安全的文件命名
-
-### 2. 文本提取
-
-- 使用pdf-parse库提取PDF文本
-- 支持中文内容
-- 错误处理和验证
-
-### 3. AI分析
-
-- 集成Coze大模型API（符合[Coze API v3规范](https://www.coze.cn/open/docs/developer_guides/chat_v3)）
-- 支持流式和非流式响应
-- 结构化分析报告
-- 包含以下评估维度：
-  - 个人信息评估
-  - 工作经验分析
-  - 技能匹配度
-  - 教育背景
-  - 整体评价和建议
-- 完善的错误处理和响应验证
-- 支持API参数调优（temperature, top_p, presence_penalty, frequency_penalty）
-
-### 4. 安全特性
-
-- CORS支持
-- 文件类型验证
-- 错误处理中间件
-- 环境变量配置
-
-## 安装和运行
-
-### 1. 安装依赖
+### cURL 示例
 
 ```bash
-cd apps/server
-pnpm install
+# 健康检查
+curl http://localhost:3001/health
+
+# 获取分析类型
+curl http://localhost:3001/api/analysis-types
+
+# 上传文件进行分析
+curl -X POST http://localhost:3001/api/analyze \
+  -F "analysis_type=evaluate" \
+  -F "question=请分析我的简历" \
+  -F "file=@resume.pdf"
+
+# 纯文本分析
+curl -X POST http://localhost:3001/api/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "analysis_type": "evaluate",
+    "question": "请分析我的简历"
+  }'
 ```
-
-### 2. 配置环境变量
-
-```bash
-cp env.example .env
-# 编辑 .env 文件，填入实际的API密钥
-```
-
-### 3. 启动服务器
-
-```bash
-# 开发模式
-pnpm run dev
-
-# 生产模式
-pnpm start
-```
-
-## 错误代码
-
-| 状态码 | 说明                             |
-| ------ | -------------------------------- |
-| 200    | 请求成功                         |
-| 400    | 请求参数错误（文件格式、大小等） |
-| 404    | 接口不存在                       |
-| 500    | 服务器内部错误                   |
 
 ## 注意事项
 
-1. 确保Coze API密钥有效且有足够配额
-2. PDF文件必须是可读的文本格式
-3. 建议在生产环境中配置HTTPS
-4. 定期清理uploads目录中的临时文件
-5. 监控API调用频率和成本
+1. **文件大小限制**: 最大 25MB
+2. **支持格式**: PDF, JPEG, PNG, GIF
+3. **流式响应**: 需要客户端支持 SSE
+4. **错误处理**: 所有端点都包含错误处理
+5. **向后兼容**: 保留了旧版本API端点
+6. **配置验证**: 启动时会验证必要的环境变量
 
-## 前端集成示例
+## 开发说明
 
-### 非流式响应
-
-```javascript
-// 使用FormData上传文件
-const formData = new FormData();
-formData.append("resume", file);
-
-const response = await fetch("http://localhost:3001/api/analyze-resume", {
-  method: "POST",
-  body: formData,
-});
-
-const result = await response.json();
-if (result.success) {
-  console.log("分析结果:", result.data.analysis);
-} else {
-  console.error("分析失败:", result.message);
-}
-```
-
-### 流式响应
-
-```javascript
-// 使用FormData上传文件
-const formData = new FormData();
-formData.append("resume", file);
-
-const response = await fetch("http://localhost:3001/api/analyze-resume-stream", {
-  method: "POST",
-  body: formData,
-});
-
-const reader = response.body.getReader();
-const decoder = new TextDecoder();
-
-while (true) {
-  const { done, value } = await reader.read();
-  
-  if (done) break;
-  
-  const chunk = decoder.decode(value);
-  const lines = chunk.split('\n');
-  
-  for (const line of lines) {
-    if (line.startsWith('data: ')) {
-      const data = line.slice(6);
-      
-      if (data === '[DONE]') {
-        console.log('分析完成');
-        break;
-      }
-      
-      try {
-        const parsed = JSON.parse(data);
-        if (parsed.choices && parsed.choices[0] && parsed.choices[0].delta && parsed.choices[0].delta.content) {
-          console.log('收到内容:', parsed.choices[0].delta.content);
-        }
-      } catch (e) {
-        // 忽略解析错误
-      }
-    }
-  }
-}
-```
+- 主要使用统一分析路由 (`/api/analyze`, `/api/analyze-stream`)
+- 其他路由主要用于向后兼容
+- 所有分析功能都基于 Coze API
+- 支持文件上传和纯文本两种模式
+- 提供流式和非流式两种响应方式
