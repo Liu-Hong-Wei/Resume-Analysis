@@ -1,196 +1,243 @@
-import {
-  analyzeResumeWithCoze,
-  analyzeResumeWithCozeFile,
-  analyzeResumeWithCozeStream,
-  analyzeResumeWithCozeFileStream,
-} from "./cozeService.js";
-import { ANALYSIS_TYPES } from "../config/index.js";
+import { cozeClient } from "./cozeService.js";
+import { configManager } from "../config/index.js";
 import { upload } from "../utils/uploadConfig.js";
 
 /**
- * 创建分析路由处理器
- * @param {string} analysisType - 分析类型 (evaluate, generate, mock)
- * @returns {Object} 路由处理器对象
+ * 分析服务类
  */
-export function createAnalysisHandler(analysisType) {
-  // 验证分析类型
-  if (!Object.values(ANALYSIS_TYPES).includes(analysisType)) {
-    throw new Error(`无效的分析类型: ${analysisType}`);
+class AnalysisService {
+  constructor() {
+    this.config = configManager;
+    this.cozeClient = cozeClient;
   }
 
-  const customVariables = {
-    analysis_type: analysisType,
-  };
-
   /**
-   * 非流式分析 - 文件上传模式
+   * 验证分析类型
+   * @param {string} analysisType - 分析类型
+   * @throws {Error} 如果分析类型无效
    */
-  const handleFileAnalysis = async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "请上传PDF文件" });
-      }
-
-      const { question } = req.body;
-
-      const result = await analyzeResumeWithCozeFile(
-        req.file.buffer,
-        req.file.originalname,
-        question,
-        customVariables
+  validateAnalysisType(analysisType) {
+    const validTypes = Object.values(this.config.analysisTypes);
+    if (!validTypes.includes(analysisType)) {
+      throw new Error(
+        `无效的分析类型: ${analysisType}。有效类型: ${validTypes.join(", ")}`
       );
-
-      res.json({
-        success: true,
-        result,
-        analysis_type: analysisType,
-      });
-    } catch (error) {
-      console.error(`${analysisType} 分析错误:`, error);
-      res.status(500).json({
-        error: error.message,
-        analysis_type: analysisType,
-      });
     }
-  };
+  }
 
   /**
-   * 流式分析 - 文件上传模式
+   * 创建自定义变量
+   * @param {string} analysisType - 分析类型
+   * @param {Object} additionalVars - 额外的自定义变量
+   * @returns {Object} 自定义变量对象
    */
-  const handleFileAnalysisStream = async (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "请上传PDF文件" });
-      }
-
-      const { question } = req.body;
-
-      await analyzeResumeWithCozeFileStream(
-        req.file.buffer,
-        res,
-        req.file.originalname,
-        question,
-        customVariables
-      );
-    } catch (error) {
-      console.error(`${analysisType} 流式分析错误:`, error);
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-      res.write("data: [DONE]\n\n");
-    }
-  };
+  createCustomVariables(analysisType, additionalVars = {}) {
+    return {
+      analysis_type: analysisType,
+      timestamp: new Date().toISOString(),
+      ...additionalVars,
+    };
+  }
 
   /**
-   * 流式分析 - 纯文本模式
+   * 处理文件分析（流式）
+   * @param {Buffer} fileBuffer - 文件Buffer
+   * @param {Response} res - Express响应对象
+   * @param {string} fileName - 文件名
+   * @param {string} question - 问题内容（可选）
+   * @param {string} analysisType - 分析类型
+   * @param {Object} additionalVars - 额外的自定义变量
+   * @returns {Promise<void>}
    */
-  const handleQuestionAnalysisStream = async (req, res) => {
-    try {
-      const { question } = req.body;
-
-      if (!question) {
-        return res.status(400).json({ error: "请提供问题内容" });
-      }
-
-      await analyzeResumeWithCozeStream(question, res, customVariables);
-    } catch (error) {
-      console.error(`${analysisType} 问题流式分析错误:`, error);
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-      res.write("data: [DONE]\n\n");
-    }
-  };
-
-  /**
-   * 非流式分析 - 纯文本模式
-   */
-  const handleQuestionAnalysis = async (req, res) => {
-    try {
-      const { question } = req.body;
-
-      if (!question) {
-        return res.status(400).json({ error: "请提供问题内容" });
-      }
-
-      const result = await analyzeResumeWithCoze(question, customVariables);
-
-      res.json({
-        success: true,
-        result,
-        analysis_type: analysisType,
-      });
-    } catch (error) {
-      console.error(`${analysisType} 问题分析错误:`, error);
-      res.status(500).json({
-        error: error.message,
-        analysis_type: analysisType,
-      });
-    }
-  };
-
-  return {
-    upload,
-    handleFileAnalysis,
-    handleFileAnalysisStream,
-    handleQuestionAnalysisStream,
-    handleQuestionAnalysis,
+  async handleFileAnalysisStream(
+    fileBuffer,
+    res,
+    fileName,
+    question,
     analysisType,
-  };
+    additionalVars = {}
+  ) {
+    try {
+      this.validateAnalysisType(analysisType);
+
+      const customVariables = this.createCustomVariables(
+        analysisType,
+        additionalVars
+      );
+
+      console.log(`开始文件流式分析:`, {
+        analysisType,
+        fileName,
+        fileSize: fileBuffer.length,
+        hasQuestion: !!question,
+      });
+
+      await this.cozeClient.analyzeFileStream(
+        fileBuffer,
+        res,
+        fileName,
+        question,
+        customVariables
+      );
+    } catch (error) {
+      console.error(`文件流式分析失败 (${analysisType}):`, error);
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          error: `${this.config.analysisTypeDescriptions[analysisType]}失败: ${error.message}`,
+        })}\n\n`
+      );
+      res.write("data: [DONE]\n\n");
+    }
+  }
+
+  /**
+   * 处理文本分析（流式）
+   * @param {string} question - 问题内容
+   * @param {Response} res - Express响应对象
+   * @param {string} analysisType - 分析类型
+   * @param {Object} additionalVars - 额外的自定义变量
+   * @returns {Promise<void>}
+   */
+  async handleTextAnalysisStream(
+    question,
+    res,
+    analysisType,
+    additionalVars = {}
+  ) {
+    try {
+      this.validateAnalysisType(analysisType);
+
+      if (!question || typeof question !== "string") {
+        throw new Error("问题内容无效");
+      }
+
+      const customVariables = this.createCustomVariables(
+        analysisType,
+        additionalVars
+      );
+
+      console.log(`开始文本流式分析:`, {
+        analysisType,
+        questionLength: question.length,
+      });
+
+      await this.cozeClient.analyzeTextStream(question, res, customVariables);
+    } catch (error) {
+      console.error(`文本流式分析失败 (${analysisType}):`, error);
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          error: `${this.config.analysisTypeDescriptions[analysisType]}失败: ${error.message}`,
+        })}\n\n`
+      );
+      res.write("data: [DONE]\n\n");
+    }
+  }
+
+  /**
+   * 创建分析处理器
+   * @param {string} analysisType - 分析类型
+   * @returns {Object} 分析处理器对象
+   */
+  createAnalysisHandler(analysisType) {
+    this.validateAnalysisType(analysisType);
+
+    return {
+      upload,
+      /**
+       * 处理文件分析（流式）
+       */
+      handleFileAnalysisStream: async (req, res) => {
+        try {
+          if (!req.file) {
+            res.write(
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "请上传文件",
+              })}\n\n`
+            );
+            res.write("data: [DONE]\n\n");
+            return;
+          }
+
+          const { question } = req.body;
+          await this.handleFileAnalysisStream(
+            req.file.buffer,
+            res,
+            req.file.originalname,
+            question,
+            analysisType
+          );
+        } catch (error) {
+          console.error(`${analysisType} 文件流式分析错误:`, error);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              error: error.message,
+            })}\n\n`
+          );
+          res.write("data: [DONE]\n\n");
+        }
+      },
+
+      /**
+       * 处理文本分析（流式）
+       */
+      handleQuestionAnalysisStream: async (req, res) => {
+        try {
+          const { question } = req.body;
+
+          if (!question) {
+            res.write(
+              `data: ${JSON.stringify({
+                type: "error",
+                error: "请提供问题内容",
+              })}\n\n`
+            );
+            res.write("data: [DONE]\n\n");
+            return;
+          }
+
+          await this.handleTextAnalysisStream(question, res, analysisType);
+        } catch (error) {
+          console.error(`${analysisType} 文本流式分析错误:`, error);
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              error: error.message,
+            })}\n\n`
+          );
+          res.write("data: [DONE]\n\n");
+        }
+      },
+    };
+  }
+
+  /**
+   * 获取分析类型信息
+   * @returns {Object} 分析类型信息
+   */
+  getAnalysisTypesInfo() {
+    return {
+      success: true,
+      analysis_types: this.config.analysisTypeDescriptions,
+      supported_file_types: this.config.fileLimits.SUPPORTED_EXTENSIONS,
+      max_file_size: this.config.fileLimits.MAX_FILE_SIZE,
+    };
+  }
 }
 
-/**
- * 创建完整的分析路由
- * @param {string} analysisType - 分析类型
- * @param {string} basePath - 基础路径
- * @returns {Object} Express路由对象
- */
-export function createAnalysisRouter(analysisType, basePath = "") {
-  const express = require("express");
-  const router = express.Router();
-  const handler = createAnalysisHandler(analysisType);
+// 创建分析服务实例
+const analysisService = new AnalysisService();
 
-  // 文件上传模式 - 非流式
-  router.post(
-    `${basePath}`,
-    handler.upload.single("file"),
-    handler.handleFileAnalysis
-  );
-
-  // 文件上传模式 - 流式
-  router.post(
-    `${basePath}-stream`,
-    handler.upload.single("file"),
-    handler.handleFileAnalysisStream
-  );
-
-  // 纯文本模式 - 流式
-  router.post(
-    `${basePath}-question-stream`,
-    handler.handleQuestionAnalysisStream
-  );
-
-  // 纯文本模式 - 非流式
-  router.post(`${basePath}-question`, handler.handleQuestionAnalysis);
-
-  return router;
+// 导出兼容性函数（保持向后兼容）
+export function createAnalysisHandler(analysisType) {
+  return analysisService.createAnalysisHandler(analysisType);
 }
 
-/**
- * 获取分析类型的中文名称
- * @param {string} analysisType - 分析类型
- * @returns {string} 中文名称
- */
-export function getAnalysisTypeName(analysisType) {
-  const typeNames = {
-    [ANALYSIS_TYPES.EVALUATE]: "简历评估",
-    [ANALYSIS_TYPES.GENERATE]: "简历生成",
-    [ANALYSIS_TYPES.MOCK]: "模拟面试",
-  };
-  return typeNames[analysisType] || "未知类型";
-}
+// 导出分析服务类
+export { AnalysisService, analysisService };
 
-/**
- * 验证分析类型
- * @param {string} analysisType - 分析类型
- * @returns {boolean} 是否有效
- */
-export function isValidAnalysisType(analysisType) {
-  return Object.values(ANALYSIS_TYPES).includes(analysisType);
-}
+// 默认导出
+export default analysisService;

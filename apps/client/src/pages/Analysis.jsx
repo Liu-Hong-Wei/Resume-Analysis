@@ -1,51 +1,37 @@
+/**
+ * 分析页面组件
+ */
 import React from "react";
 import { useResumeAnalysis } from "../hooks/useResumeAnalysis";
-import ResumeUpload from "../components/ResumeUpload";
-import AnalysisTypeSelector from "../components/AnalysisTypeSelector";
-import ChatInterface from "../components/ChatInterface";
-import ResumePreview from "../components/ResumePreview";
-import ErrorAlert from "../components/ErrorAlert";
+import ResumeUpload from "../components/sidebar/ResumeUpload";
+import FileInfo from "../components/sidebar/FileInfo";
+import AnalysisTypeSelector from "../components/sidebar/AnalysisTypeSelector";
+import ErrorAlert from "../components/sidebar/ErrorAlert";
+import ChatInterface from "../components/chatBox/ChatInterface";
 
 function Analysis() {
-  // 使用useResumeAnalysis hook
-  const resumeAnalysis = useResumeAnalysis();
-
-  // 解构所有需要的状态和方法
   const {
     // 状态
     selectedFile,
     analysisType,
     isAnalyzing,
-    resumeText,
     streamingContent,
-    conversationHistory,
-    currentMessage,
-    isSending,
-    streamingResponse,
     error,
-    messagesEndRef,
-    suggestedQuestions,
+    messages,
 
     // 方法
-    setAnalysisType,
-    setCurrentMessage,
     handleFileChange,
+    handleAnalysisTypeChange,
+    handleErrorClose,
+    resetAnalysis,
     analyzeResumeStream,
     sendMessage,
-    handleKeyDown,
-    setError,
-    handleSuggestedQuestionClick,
-  } = resumeAnalysis;
-
-  // 处理错误关闭
-  const handleErrorClose = () => {
-    setError(null);
-  };
+  } = useResumeAnalysis();
 
   return (
     <div className="flex flex-col min-h-[90vh] mx-auto pt-6 px-6">
       {/* 页面标题 */}
-      <div className="hero bg-base-200 basis-1/12">
+      <div className="hero bg-base-200 basis-1/12 rounded-lg mb-6">
         <div className="hero-content text-center">
           <div className="max-w-md">
             <h1 className="text-5xl font-bold">AI简历分析</h1>
@@ -67,10 +53,13 @@ function Analysis() {
             onFileChange={handleFileChange}
           />
 
+          {/* 文件信息 */}
+          <FileInfo file={selectedFile} onRemove={resetAnalysis} />
+
           {/* 分析类型选择 */}
           <AnalysisTypeSelector
             analysisType={analysisType}
-            onAnalysisTypeChange={setAnalysisType}
+            onAnalysisTypeChange={handleAnalysisTypeChange}
           />
 
           {/* 开始分析按钮 */}
@@ -88,39 +77,20 @@ function Analysis() {
               "开始AI分析"
             )}
           </button>
-
-          {/* 流式内容显示 */}
-          {streamingContent && (
-            <div className="card bg-base-100 shadow-md">
-              <div className="card-body">
-                <h2 className="card-title">实时分析</h2>
-                <div className="prose max-w-none">
-                  <p className="whitespace-pre-wrap">{streamingContent}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 简历预览 */}
-          <ResumePreview resumeText={resumeText} />
         </div>
 
         {/* 右侧：对话栏 */}
         <div className="xl:w-3/4">
-          <ChatInterface
-            resumeText={resumeText}
-            conversationHistory={conversationHistory}
-            currentMessage={currentMessage}
-            isSending={isSending}
-            streamingResponse={streamingResponse}
-            messagesEndRef={messagesEndRef}
-            onMessageChange={(e) => setCurrentMessage(e.target.value)}
-            onSendMessage={sendMessage}
-            onKeyDown={handleKeyDown}
-            onSuggestedQuestionClick={handleSuggestedQuestionClick}
-            suggestedQuestions={suggestedQuestions}
-            className="h-full"
-          />
+          <div className="card bg-base-100 shadow-lg h-full">
+            <div className="card-body p-0">
+              <ChatInterface
+                messages={messages}
+                onSendMessage={sendMessage}
+                streamingContent={streamingContent}
+                isAnalyzing={isAnalyzing}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

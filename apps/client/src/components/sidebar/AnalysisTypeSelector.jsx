@@ -1,11 +1,14 @@
 import React from "react";
-import { ANALYSIS_TYPES } from "../hooks/useResumeAnalysis";
+import { ANALYSIS_TYPES } from "../../hooks/useResumeAnalysis";
 
 const AnalysisTypeSelector = ({ analysisType, onAnalysisTypeChange }) => {
   return (
     <div className="card bg-base-100 shadow-xl">
       <div className="card-body">
-        <h2 className="card-title">分析类型</h2>
+        <h2 className="card-title">
+          <span className="text-secondary">🎯</span>
+          分析类型
+        </h2>
         <div className="form-control flex flex-col gap-1 xl:text-lg text-md">
           {ANALYSIS_TYPES.map((type) => (
             <label key={type.id} className="label cursor-pointer">

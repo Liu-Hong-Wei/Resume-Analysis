@@ -1,248 +1,138 @@
 import express from "express";
-import {
-  createAnalysisHandler,
-} from "../services/analysisService.js";
-import { ANALYSIS_TYPES } from "../config/index.js";
-import { upload } from "../utils/uploadConfig.js";
+import { analysisService } from "../services/analysisService.js";
+import { configManager } from "../config/index.js";
 
 const router = express.Router();
 
-// 创建三种分析类型的处理器
-const evaluateHandler = createAnalysisHandler(ANALYSIS_TYPES.EVALUATE);
-const generateHandler = createAnalysisHandler(ANALYSIS_TYPES.GENERATE);
-const mockHandler = createAnalysisHandler(ANALYSIS_TYPES.MOCK);
-
-// ==================== 简历评估路由 ====================
-
 /**
- * 简历评估API端点（非流式）- 直接上传PDF文件
- * POST /api/evaluate-resume
+ * 路由管理器类
  */
-router.post(
-  "/evaluate-resume",
-  evaluateHandler.upload.single("file"),
-  evaluateHandler.handleFileAnalysis
-);
-
-/**
- * 简历评估API端点（流式响应）- 直接上传PDF文件
- * POST /api/evaluate-resume-stream
- */
-router.post(
-  "/evaluate-resume-stream",
-  evaluateHandler.upload.single("file"),
-  evaluateHandler.handleFileAnalysisStream
-);
-
-/**
- * 简历评估API端点（流式响应）- 只有用户提问，没有文件上传
- * POST /api/evaluate-resume-question-stream
- */
-router.post(
-  "/evaluate-resume-question-stream",
-  evaluateHandler.handleQuestionAnalysisStream
-);
-
-/**
- * 简历评估API端点（纯文本模式）- 只有用户提问，没有文件上传
- * POST /api/evaluate-resume-question
- */
-router.post(
-  "/evaluate-resume-question",
-  evaluateHandler.handleQuestionAnalysis
-);
-
-// ==================== 简历生成路由 ====================
-
-/**
- * 简历生成API端点（非流式）- 直接上传PDF文件
- * POST /api/generate-resume
- */
-router.post(
-  "/generate-resume",
-  generateHandler.upload.single("file"),
-  generateHandler.handleFileAnalysis
-);
-
-/**
- * 简历生成API端点（流式响应）- 直接上传PDF文件
- * POST /api/generate-resume-stream
- */
-router.post(
-  "/generate-resume-stream",
-  generateHandler.upload.single("file"),
-  generateHandler.handleFileAnalysisStream
-);
-
-/**
- * 简历生成API端点（流式响应）- 只有用户提问，没有文件上传
- * POST /api/generate-resume-question-stream
- */
-router.post(
-  "/generate-resume-question-stream",
-  generateHandler.handleQuestionAnalysisStream
-);
-
-/**
- * 简历生成API端点（纯文本模式）- 只有用户提问，没有文件上传
- * POST /api/generate-resume-question
- */
-router.post(
-  "/generate-resume-question",
-  generateHandler.handleQuestionAnalysis
-);
-
-// ==================== 模拟面试路由 ====================
-
-/**
- * 模拟面试API端点（非流式）- 直接上传PDF文件
- * POST /api/mock-interview
- */
-router.post(
-  "/mock-interview",
-  mockHandler.upload.single("file"),
-  mockHandler.handleFileAnalysis
-);
-
-/**
- * 模拟面试API端点（流式响应）- 直接上传PDF文件
- * POST /api/mock-interview-stream
- */
-router.post(
-  "/mock-interview-stream",
-  mockHandler.upload.single("file"),
-  mockHandler.handleFileAnalysisStream
-);
-
-/**
- * 模拟面试API端点（流式响应）- 只有用户提问，没有文件上传
- * POST /api/mock-interview-question-stream
- */
-router.post(
-  "/mock-interview-question-stream",
-  mockHandler.handleQuestionAnalysisStream
-);
-
-/**
- * 模拟面试API端点（纯文本模式）- 只有用户提问，没有文件上传
- * POST /api/mock-interview-question
- */
-router.post("/mock-interview-question", mockHandler.handleQuestionAnalysis);
-
-// ==================== 通用分析路由 ====================
-
-/**
- * 通用分析API端点 - 通过参数指定分析类型
- * POST /api/analyze
- * Body: { analysis_type: "evaluate|generate|mock", question: "问题内容" }
- * 或使用 multipart/form-data 上传文件
- */
-router.post("/analyze", upload.single("file"), async (req, res) => {
-  try {
-    const { analysis_type } = req.body;
-
-    if (
-      !analysis_type ||
-      !Object.values(ANALYSIS_TYPES).includes(analysis_type)
-    ) {
-      return res.status(400).json({
-        error: "请提供有效的分析类型",
-        valid_types: Object.values(ANALYSIS_TYPES),
-      });
-    }
-
-    // 根据分析类型选择对应的处理器
-    let handler;
-    switch (analysis_type) {
-      case ANALYSIS_TYPES.EVALUATE:
-        handler = evaluateHandler;
-        break;
-      case ANALYSIS_TYPES.GENERATE:
-        handler = generateHandler;
-        break;
-      case ANALYSIS_TYPES.MOCK:
-        handler = mockHandler;
-        break;
-      default:
-        return res.status(400).json({ error: "无效的分析类型" });
-    }
-
-    // 如果有文件上传，使用文件分析处理器
-    if (req.file) {
-      return handler.handleFileAnalysis(req, res);
-    } else {
-      // 否则使用问题分析处理器
-      return handler.handleQuestionAnalysis(req, res);
-    }
-  } catch (error) {
-    console.error("通用分析错误:", error);
-    res.status(500).json({ error: error.message });
+class RouteManager {
+  constructor() {
+    this.config = configManager;
+    this.analysisService = analysisService;
   }
-});
 
-/**
- * 通用分析API端点（流式）- 通过参数指定分析类型
- * POST /api/analyze-stream
- * Body: { analysis_type: "evaluate|generate|mock", question: "问题内容" }
- * 或使用 multipart/form-data 上传文件
- */
-router.post("/analyze-stream", upload.single("file"), async (req, res) => {
-  try {
-    const { analysis_type } = req.body;
+  /**
+   * 创建特定分析类型的路由
+   * @param {string} analysisType - 分析类型
+   * @returns {Object} 路由处理器对象
+   */
+  createAnalysisRoutes(analysisType) {
+    const handler = this.analysisService.createAnalysisHandler(analysisType);
+    const typeName = this.config.analysisTypeDescriptions[analysisType];
 
-    if (
-      !analysis_type ||
-      !Object.values(ANALYSIS_TYPES).includes(analysis_type)
-    ) {
-      return res.status(400).json({
-        error: "请提供有效的分析类型",
-        valid_types: Object.values(ANALYSIS_TYPES),
-      });
-    }
+    return {
+      // 文件分析（流式）
+      [`/${analysisType}-resume-stream`]: {
+        method: "POST",
+        middleware: [handler.upload.single("file")],
+        handler: handler.handleFileAnalysisStream,
+        description: `${typeName} - 文件上传模式（流式）`,
+      },
 
-    // 根据分析类型选择对应的处理器
-    let handler;
-    switch (analysis_type) {
-      case ANALYSIS_TYPES.EVALUATE:
-        handler = evaluateHandler;
-        break;
-      case ANALYSIS_TYPES.GENERATE:
-        handler = generateHandler;
-        break;
-      case ANALYSIS_TYPES.MOCK:
-        handler = mockHandler;
-        break;
-      default:
-        return res.status(400).json({ error: "无效的分析类型" });
-    }
-
-    // 如果有文件上传，使用文件流式分析处理器
-    if (req.file) {
-      return handler.handleFileAnalysisStream(req, res);
-    } else {
-      // 否则使用问题流式分析处理器
-      return handler.handleQuestionAnalysisStream(req, res);
-    }
-  } catch (error) {
-    console.error("通用流式分析错误:", error);
-    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-    res.write("data: [DONE]\n\n");
+      // 文本分析（流式）
+      [`/${analysisType}-resume-question-stream`]: {
+        method: "POST",
+        handler: handler.handleQuestionAnalysisStream,
+        description: `${typeName} - 文本模式（流式）`,
+      },
+    };
   }
-});
 
-/**
- * 获取支持的分析类型
- * GET /api/analysis-types
- */
-router.get("/analysis-types", (req, res) => {
-  res.json({
-    success: true,
-    analysis_types: {
-      [ANALYSIS_TYPES.EVALUATE]: "简历评估",
-      [ANALYSIS_TYPES.GENERATE]: "简历生成",
-      [ANALYSIS_TYPES.MOCK]: "模拟面试",
-    },
-  });
-});
+  /**
+   * 注册所有分析路由
+   * @param {express.Router} router - Express 路由对象
+   */
+  registerAnalysisRoutes(router) {
+    router.post("/analyze", (req, res) => {
+      const { analysis_type } = req.body;
+      const handler = this.analysisService.createAnalysisHandler(analysis_type);
+      handler.handleFileAnalysis(req, res);
+      // TODO: 这里需要添加流式分析的逻辑
 
+    });
+
+    // 获取分析类型信息
+    router.get("/analysis-types", (req, res) => {
+      try {
+        const info = this.analysisService.getAnalysisTypesInfo();
+        res.json(info);
+      } catch (error) {
+        console.error("获取分析类型信息失败:", error);
+        res.status(500).json({
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    // 健康检查
+    router.get("/health", (req, res) => {
+      try {
+        const healthInfo = {
+          status: "ok",
+          message: "服务器运行正常",
+          timestamp: new Date().toISOString(),
+          config: this.config.getSummary(),
+        };
+        res.json(healthInfo);
+      } catch (error) {
+        console.error("健康检查失败:", error);
+        res.status(500).json({
+          status: "error",
+          message: "服务器运行异常",
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    return router;
+  }
+
+  /**
+   * 设置路由中间件
+   * @param {express.Router} router - Express 路由对象
+   */
+  setupMiddleware(router) {
+    // 请求日志中间件
+    router.use((req, res, next) => {
+      console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+      next();
+    });
+
+    // 错误处理中间件
+    router.use((error, req, res, next) => {
+      console.error("路由错误:", error);
+
+      if (res.headersSent) {
+        return next(error);
+      }
+
+      res.status(500).json({
+        error: "服务器内部错误",
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      });
+    });
+  }
+}
+
+// 创建路由管理器实例
+const routeManager = new RouteManager();
+
+// 设置路由中间件
+routeManager.setupMiddleware(router);
+
+// 注册所有分析路由
+routeManager.registerAnalysisRoutes(router);
+
+// 创建通用路由
+routeManager.createUnifiedRoutes(router);
+
+// 导出路由管理器类
+export { RouteManager, routeManager };
+
+// 默认导出路由
 export default router;

@@ -3,7 +3,6 @@ import NavLayout from "./Layout/NavLayout";
 import Home from "./pages/Home";
 import Analysis from "./pages/Analysis";
 import About from "./pages/About";
-import Chat from "./pages/Chat";
 
 function App() {
   return (

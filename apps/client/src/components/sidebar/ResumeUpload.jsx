@@ -2,21 +2,24 @@ import React from "react";
 
 const ResumeUpload = ({ selectedFile, onFileChange }) => {
   return (
-    <div className="card bg-base-100 shadow-xl">
+    <div className="card bg-base-100 shadow-lg">
       <div className="card-body">
-        <h2 className="card-title">上传简历</h2>
-
+        <h2 className="card-title">
+          <span className="text-primary">📄</span>
+          上传简历
+        </h2>
         <div className="form-control w-full">
-          <label className="label">
+          <label className="label cursor-pointer mb-2">
             <span className="label-text">选择文件</span>
             <span className="label-text-alt">支持 PDF、Word、TXT 格式</span>
           </label>
-          <input
+          {!selectedFile && <input
             type="file"
             className="file-input file-input-bordered file-input-primary w-full"
             accept=".pdf,.doc,.docx,.txt"
             onChange={onFileChange}
-          />
+            disabled={!!selectedFile}
+          />}
           {selectedFile && (
             <div className="alert alert-success mt-4">
               <svg
