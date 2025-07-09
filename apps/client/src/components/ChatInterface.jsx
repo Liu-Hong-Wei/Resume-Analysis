@@ -6,6 +6,7 @@ const ChatInterface = ({
   conversationHistory = [],
   currentMessage = "",
   isSending = false,
+  streamingResponse = "",
   messagesEndRef,
   onMessageChange,
   onSendMessage,
@@ -39,7 +40,15 @@ const ChatInterface = ({
                 <MessageBox key={index} message={message} />
               ))}
 
-              {isSending && (
+              {/* 流式响应显示 */}
+              {streamingResponse && (
+                <MessageBox
+                  message={{ role: "assistant", content: streamingResponse }}
+                  isStreaming={true}
+                />
+              )}
+
+              {isSending && !streamingResponse && (
                 <MessageBox
                   message={{ role: "assistant", content: "" }}
                   isTyping={true}

@@ -18,8 +18,8 @@ function NavLayout() {
 
   const navItems = [
     { path: "/", label: "首页", icon: "🏠" },
-    { path: "/analysis", label: "简历分析", icon: "��" },
-    { path: "/chat", label: "AI对话", icon: "💬" },
+    { path: "/analysis", label: "简历分析", icon: "💬" },
+    // { path: "/chat", label: "AI对话", icon: "💬" },
     { path: "/about", label: "关于我们", icon: "ℹ️" },
   ];
 

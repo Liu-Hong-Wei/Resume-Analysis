@@ -1,6 +1,6 @@
 import React from "react";
 
-const MessageBox = ({ message, isTyping = false }) => {
+const MessageBox = ({ message, isTyping = false, isStreaming = false }) => {
   const isUser = message.role === "user";
 
   return (
@@ -27,6 +27,11 @@ const MessageBox = ({ message, isTyping = false }) => {
           <div className="flex items-center gap-2">
             <span className="loading loading-dots loading-sm"></span>
             AI正在思考中...
+          </div>
+        ) : isStreaming ? (
+          <div className="whitespace-pre-wrap">
+            {message.content}
+            <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1"></span>
           </div>
         ) : (
           <div className="whitespace-pre-wrap">{message.content}</div>

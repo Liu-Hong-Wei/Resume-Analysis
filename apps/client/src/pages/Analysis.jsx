@@ -7,36 +7,38 @@ import ResumePreview from "../components/ResumePreview";
 import ErrorAlert from "../components/ErrorAlert";
 
 function Analysis() {
+  // 使用useResumeAnalysis hook
+  const resumeAnalysis = useResumeAnalysis();
+
+  // 解构所有需要的状态和方法
   const {
     // 状态
     selectedFile,
     analysisType,
     isAnalyzing,
     resumeText,
+    streamingContent,
     conversationHistory,
     currentMessage,
     isSending,
+    streamingResponse,
     error,
     messagesEndRef,
+    suggestedQuestions,
 
     // 方法
     setAnalysisType,
     setCurrentMessage,
     handleFileChange,
-    analyzeResume,
+    analyzeResumeStream,
     sendMessage,
     handleKeyDown,
     setError,
-  } = useResumeAnalysis();
-
-  // 处理快捷问题点击
-  const handleSuggestedQuestionClick = (question) => {
-    setCurrentMessage(question);
-  };
+    handleSuggestedQuestionClick,
+  } = resumeAnalysis;
 
   // 处理错误关闭
   const handleErrorClose = () => {
-    // 这里可以添加清除错误的逻辑
     setError(null);
   };
 
@@ -71,9 +73,9 @@ function Analysis() {
             onAnalysisTypeChange={setAnalysisType}
           />
 
-          {/* 开始分析按钮 TODO: 不需要这个按钮 */}
+          {/* 开始分析按钮 */}
           <button
-            onClick={analyzeResume}
+            onClick={analyzeResumeStream}
             disabled={!selectedFile || isAnalyzing}
             className="btn btn-primary btn-block btn-lg"
           >
@@ -87,6 +89,18 @@ function Analysis() {
             )}
           </button>
 
+          {/* 流式内容显示 */}
+          {streamingContent && (
+            <div className="card bg-base-100 shadow-md">
+              <div className="card-body">
+                <h2 className="card-title">实时分析</h2>
+                <div className="prose max-w-none">
+                  <p className="whitespace-pre-wrap">{streamingContent}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* 简历预览 */}
           <ResumePreview resumeText={resumeText} />
         </div>
@@ -98,11 +112,13 @@ function Analysis() {
             conversationHistory={conversationHistory}
             currentMessage={currentMessage}
             isSending={isSending}
+            streamingResponse={streamingResponse}
             messagesEndRef={messagesEndRef}
             onMessageChange={(e) => setCurrentMessage(e.target.value)}
             onSendMessage={sendMessage}
             onKeyDown={handleKeyDown}
             onSuggestedQuestionClick={handleSuggestedQuestionClick}
+            suggestedQuestions={suggestedQuestions}
             className="h-full"
           />
         </div>
