@@ -9,10 +9,15 @@ export const upload = multer({
     fileSize: 25 * 1024 * 1024, // 25MB
   },
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === "application/pdf") {
+    if (
+      file.mimetype === "application/pdf" ||
+      file.mimetype === "image/png" ||
+      file.mimetype === "image/jpeg" ||
+      file.mimetype === "image/jpg"
+    ) {
       cb(null, true);
     } else {
-      cb(new Error("只支持PDF文件"), false);
+      cb(new Error("只支持PDF文件或图片（PNG、JPG、JPEG）"), false);
     }
   },
 });

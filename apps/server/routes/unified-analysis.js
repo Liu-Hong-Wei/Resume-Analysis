@@ -1,6 +1,7 @@
 import express from "express";
 import { analysisService } from "../services/analysisService.js";
 import { configManager } from "../config/index.js";
+import { upload } from "../utils/uploadConfig.js";
 
 const router = express.Router();
 
@@ -45,12 +46,51 @@ class RouteManager {
    * @param {express.Router} router - Express 路由对象
    */
   registerAnalysisRoutes(router) {
-    router.post("/analyze", (req, res) => {
-      const { analysis_type } = req.body;
-      const handler = this.analysisService.createAnalysisHandler(analysis_type);
-      handler.handleFileAnalysis(req, res);
-      // TODO: 这里需要添加流式分析的逻辑
+    router.post("/analyze", upload.single("file"), async (req, res) => {
+      try {
+        const {
+          analysis_type,
+          question,
+          conversation_id,
+          user_id = "default_user",
+        } = req.body;
+        console.log("--------------------------------");
+        console.log("req.body: ", req.body);
+        console.log("analysis_type: ", analysis_type);
+        console.log("conversation_id: ", conversation_id);
+        console.log("--------------------------------");
 
+        if (!analysis_type) {
+          return res.status(400).json({
+            error: "缺少必需参数: analysis_type",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        const handler =
+          this.analysisService.createAnalysisHandler(analysis_type);
+
+        // 只支持流式分析
+        if (req.file) {
+          console.log("进入文件上传模式");
+          // 文件上传模式（流式）
+          await handler.handleFileAnalysisStream(req, res);
+        } else {
+          console.log("进入文本模式");
+          // 文本模式（流式）
+          await handler.handleQuestionAnalysisStream(req, res);
+        }
+      } catch (error) {
+        console.error("统一分析接口错误:", error);
+
+        if (!res.headersSent) {
+          res.status(500).json({
+            error: "分析失败",
+            message: error.message,
+            timestamp: new Date().toISOString(),
+          });
+        }
+      }
     });
 
     // 获取分析类型信息
@@ -60,6 +100,89 @@ class RouteManager {
         res.json(info);
       } catch (error) {
         console.error("获取分析类型信息失败:", error);
+        res.status(500).json({
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    // 获取用户对话列表
+    router.post("/conversations", async (req, res) => {
+      try {
+        const { user_id, limit = 20, order = "desc" } = req.body;
+
+        if (!user_id) {
+          return res.status(400).json({
+            error: "缺少必需参数: user_id",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        console.log("获取用户对话列表:", { user_id, limit, order });
+
+        // 调用Coze API获取对话列表
+        const conversations = await this.analysisService.getUserConversations(
+          user_id,
+          {
+            limit,
+            order,
+          }
+        );
+
+        res.json({
+          success: true,
+          data: conversations,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("获取用户对话列表失败:", error);
+        res.status(500).json({
+          error: error.message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    });
+
+    // 获取对话消息列表
+    router.post("/conversations/:conversationId/messages", async (req, res) => {
+      try {
+        const { conversationId } = req.params;
+        const { limit, order = "asc", chat_id, before_id } = req.body;
+
+        if (!conversationId) {
+          return res.status(400).json({
+            error: "缺少必需参数: conversationId",
+            timestamp: new Date().toISOString(),
+          });
+        }
+
+        console.log("获取对话消息:", {
+          conversationId,
+          limit,
+          order,
+          chat_id,
+          before_id,
+        });
+
+        // 调用Coze API获取消息列表
+        const messages = await this.analysisService.getConversationMessages(
+          conversationId,
+          {
+            limit,
+            order,
+            chat_id,
+            before_id,
+          }
+        );
+
+        res.json({
+          success: true,
+          ...messages,
+          timestamp: new Date().toISOString(),
+        });
+      } catch (error) {
+        console.error("获取对话消息失败:", error);
         res.status(500).json({
           error: error.message,
           timestamp: new Date().toISOString(),
@@ -89,6 +212,41 @@ class RouteManager {
     });
 
     return router;
+  }
+
+  /**
+   * 创建统一路由
+   * @param {express.Router} router - Express 路由对象
+   */
+  createUnifiedRoutes(router) {
+    // 获取所有分析类型
+    const analysisTypes = Object.keys(this.config.analysisTypeDescriptions);
+
+    // 为每种分析类型创建专用路由
+    analysisTypes.forEach((analysisType) => {
+      const routes = this.createAnalysisRoutes(analysisType);
+
+      Object.entries(routes).forEach(([path, routeConfig]) => {
+        const fullPath = `/analysis${path}`;
+
+        console.log(
+          `注册路由: ${routeConfig.method} ${fullPath} - ${routeConfig.description}`
+        );
+
+        if (routeConfig.middleware && routeConfig.middleware.length > 0) {
+          router[routeConfig.method.toLowerCase()](
+            fullPath,
+            ...routeConfig.middleware,
+            routeConfig.handler
+          );
+        } else {
+          router[routeConfig.method.toLowerCase()](
+            fullPath,
+            routeConfig.handler
+          );
+        }
+      });
+    });
   }
 
   /**

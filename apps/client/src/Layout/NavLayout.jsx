@@ -35,7 +35,7 @@ function NavLayout() {
       >
         <div className="navbar-start">
           {/* 移动端菜单按钮 */}
-          <div className="dropdown lg:hidden">
+          <div className="dropdown xl:hidden">
             <div
               tabIndex={0}
               role="button"
@@ -104,7 +104,7 @@ function NavLayout() {
         </div>
 
         {/* 桌面端导航菜单 */}
-        <div className="navbar-center hidden lg:flex">
+        <div className="navbar-center hidden xl:flex">
           <ul className="menu menu-horizontal px-1 gap-1">
             {navItems.map((item) => (
               <li key={item.path}>

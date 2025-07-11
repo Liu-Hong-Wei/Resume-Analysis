@@ -5,6 +5,8 @@ import React from "react";
  */
 const FileInfo = ({ file, onRemove }) => {
   if (!file) return null;
+  console.log("file", file);
+  console.log("file.name", file.name);
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return "0 Bytes";
@@ -24,6 +26,10 @@ const FileInfo = ({ file, onRemove }) => {
         return "📝";
       case "txt":
         return "📃";
+      case "png":
+      case "jpg":
+      case "jpeg":
+        return "📷";
       default:
         return "📁";
     }

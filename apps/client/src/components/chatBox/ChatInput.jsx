@@ -30,13 +30,3 @@ const ChatInput = ({
 };
 
 export default ChatInput;
-
-// className="textarea textarea-bordered flex-1 rounded-2xl border-base-300 focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 focus:shadow-lg shadow-sm transition-all duration-300 resize-none text-base"
-// rows="2"
-// disabled={isSending || disabled}
-// style={{
-//   minHeight: "3rem",
-//   fontSize: "1.2rem",
-//   background: "#fafbfc",
-//   padding: "0.5rem",
-// }}

@@ -10,11 +10,23 @@ const ChatInterface = ({
   messages = [],
   onSendMessage,
   streamingContent,
-  isAnalyzing,
+  isStreaming,
+  currentConversation,
+  analysisType,
+  error,
 }) => {
   const [inputValue, setInputValue] = useState("");
   const messagesEndRef = useRef(null);
   const [isTyping, setIsTyping] = useState(false);
+
+  // 调试信息：跟踪状态变化
+  useEffect(() => {
+    console.log("ChatInterface 状态变化:", {
+      isStreaming,
+      streamingContent: streamingContent ? streamingContent.length : 0,
+      messagesCount: messages.length,
+    });
+  }, [isStreaming, streamingContent, messages.length]);
 
   // 自动滚动到底部
   const scrollToBottom = () => {
@@ -27,12 +39,14 @@ const ChatInterface = ({
 
   // 处理发送消息
   const handleSendMessage = async () => {
-    if (!inputValue.trim() || isTyping) return;
+    if (!inputValue.trim() || isTyping || isStreaming) return;
 
+    const messageToSend = inputValue.trim();
     setIsTyping(true);
+    setInputValue("");
+
     try {
-      await onSendMessage(inputValue);
-      setInputValue("");
+      await onSendMessage(messageToSend);
     } catch (error) {
       console.error("发送消息失败:", error);
     } finally {
@@ -48,24 +62,29 @@ const ChatInterface = ({
     }
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* 聊天头部 */}
-      <div className="flex-shrink-0 p-4 border-b border-base-300">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">AI 助手对话</h2>
-          {isAnalyzing && (
-            <div className="flex items-center gap-2 text-sm text-primary">
-              <span className="loading loading-spinner loading-xs"></span>
-              <span>AI 分析中...</span>
-            </div>
-          )}
+  // 渲染状态指示器
+  const renderStatusIndicator = () => {
+    if (isStreaming) {
+      return (
+        <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-md">
+          <div className="animate-pulse h-2 w-2 bg-green-400 rounded-full"></div>
+          <span className="text-sm text-green-600">AI正在思考...</span>
         </div>
-      </div>
+      );
+    }
+    return null;
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-white">
+      {/* 状态指示器 */}
+      {renderStatusIndicator() && (
+        <div className="p-4 border-b">{renderStatusIndicator()}</div>
+      )}
 
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.length === 0 && !streamingContent && !isAnalyzing && (
+        {messages.length === 0 && !streamingContent && !isStreaming && (
           <div className="flex items-center justify-center h-full text-center text-base-content/60">
             <div className="max-w-md">
               <div className="text-6xl mb-4">🤖</div>
@@ -79,46 +98,56 @@ const ChatInterface = ({
             </div>
           </div>
         )}
-
-        {/* 显示消息 */}
-        {messages.map((message) => (
-          <MessageBox key={message.id} message={message} />
+        {messages.map((message, index) => (
+          <MessageBox
+            key={message.id || index}
+            message={message}
+            isOwn={message.role === "user"}
+            timestamp={message.timestamp}
+          />
         ))}
 
         {/* 流式内容显示 */}
         {streamingContent && (
-          <div className="chat chat-start">
-            <div className="chat-bubble chat-bubble-primary">
-              <div className="prose max-w-none">
-                <p className="whitespace-pre-wrap">{streamingContent}</p>
-                {isAnalyzing && (
-                  <span className="inline-block w-2 h-4 bg-current animate-pulse ml-1"></span>
-                )}
-              </div>
-            </div>
-          </div>
+          <MessageBox
+            message={{
+              role: "assistant",
+              content: streamingContent,
+              timestamp: new Date().toISOString(),
+            }}
+            isOwn={false}
+            isStreaming={true}
+          />
         )}
 
-        {/* 滚动到底部的锚点 */}
         <div ref={messagesEndRef} />
       </div>
 
       {/* 输入区域 */}
-      <div className="flex-shrink-0 p-4 border-t border-base-300">
+      <div className="border-t p-4">
         <div className="flex gap-2">
           <ChatInput
             value={inputValue}
             onChange={setInputValue}
             onKeyPress={handleKeyPress}
-            placeholder="输入您的问题..."
-            disabled={isTyping || isAnalyzing}
+            placeholder="输入消息..."
+            disabled={isStreaming || isTyping}
+            multiline
           />
           <ChatSendButton
             onClick={handleSendMessage}
-            disabled={!inputValue.trim() || isTyping || isAnalyzing}
-            isLoading={isTyping}
+            disabled={!inputValue.trim() || isStreaming || isTyping}
+            isLoading={isStreaming || isTyping}
           />
         </div>
+
+        {/* 输入状态提示 */}
+        {(isStreaming || isTyping) && (
+          <div className="mt-2 text-sm text-gray-500">
+            {isTyping && "正在发送..."}
+            {isStreaming && !isTyping && "AI正在回复..."}
+          </div>
+        )}
       </div>
     </div>
   );

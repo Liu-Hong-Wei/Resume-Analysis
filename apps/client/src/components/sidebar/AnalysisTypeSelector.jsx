@@ -1,5 +1,5 @@
 import React from "react";
-import { ANALYSIS_TYPES } from "../../hooks/useResumeAnalysis";
+import { ANALYSIS_TYPES } from "../../pages/Analysis";
 
 const AnalysisTypeSelector = ({ analysisType, onAnalysisTypeChange }) => {
   return (
@@ -11,9 +11,9 @@ const AnalysisTypeSelector = ({ analysisType, onAnalysisTypeChange }) => {
         </h2>
         <div className="form-control flex flex-col gap-1 xl:text-lg text-md">
           {ANALYSIS_TYPES.map((type) => (
-            <label key={type.id} className="label cursor-pointer">
+            <label key={type.id} className="label cursor-pointer mt-2">
               <span className="label-text flex items-center gap-2">
-                <span className="text-2xl">{type.icon}</span>
+                <span className="text-3xl">{type.icon}</span>
                 <div>
                   <div className="font-semibold">{type.title}</div>
                   <div className="text-sm opacity-70">{type.description}</div>

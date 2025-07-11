@@ -3,7 +3,11 @@ import React from "react";
 /**
  * 聊天发送按钮组件
  */
-const ChatSendButton = ({ onClick, disabled = false, isLoading = false }) => {
+const ChatSendButton = ({
+  onClick,
+  disabled = false,
+  isLoading = false,
+}) => {
   return (
     <button
       onClick={onClick}

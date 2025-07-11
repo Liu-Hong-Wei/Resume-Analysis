@@ -106,7 +106,11 @@ class AnalysisService {
     additionalVars = {}
   ) {
     try {
+      console.log("handleTextAnalysisStream 开始执行");
+      console.log("参数:", { question, analysisType, additionalVars });
+
       this.validateAnalysisType(analysisType);
+      console.log("分析类型验证通过");
 
       if (!question || typeof question !== "string") {
         throw new Error("问题内容无效");
@@ -116,12 +120,14 @@ class AnalysisService {
         analysisType,
         additionalVars
       );
+      console.log("自定义变量创建完成:", customVariables);
 
       console.log(`开始文本流式分析:`, {
         analysisType,
         questionLength: question.length,
       });
 
+      console.log("调用 cozeClient.analyzeTextStream");
       await this.cozeClient.analyzeTextStream(question, res, customVariables);
     } catch (error) {
       console.error(`文本流式分析失败 (${analysisType}):`, error);
@@ -132,6 +138,52 @@ class AnalysisService {
         })}\n\n`
       );
       res.write("data: [DONE]\n\n");
+    }
+  }
+
+  /**
+   * 获取用户对话列表
+   * @param {string} userId - 用户ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Array>} 对话列表
+   */
+  async getUserConversations(userId, options = {}) {
+    try {
+      console.log("获取用户对话列表:", { userId, options });
+
+      // 调用Coze API获取对话列表
+      const conversations = await this.cozeClient.getUserConversations(
+        userId,
+        options
+      );
+
+      return conversations;
+    } catch (error) {
+      console.error("获取用户对话列表失败:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取对话消息列表
+   * @param {string} conversationId - 对话ID
+   * @param {Object} options - 查询选项
+   * @returns {Promise<Object>} 消息列表和分页信息
+   */
+  async getConversationMessages(conversationId, options = {}) {
+    try {
+      console.log("获取对话消息:", { conversationId, options });
+
+      // 调用Coze API获取消息列表
+      const messages = await this.cozeClient.getConversationMessages(
+        conversationId,
+        options
+      );
+
+      return messages;
+    } catch (error) {
+      console.error("获取对话消息失败:", error);
+      throw error;
     }
   }
 
@@ -150,6 +202,15 @@ class AnalysisService {
        */
       handleFileAnalysisStream: async (req, res) => {
         try {
+          // 首先设置流式响应头
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+          });
+
           if (!req.file) {
             res.write(
               `data: ${JSON.stringify({
@@ -161,16 +222,44 @@ class AnalysisService {
             return;
           }
 
-          const { question } = req.body;
-          await this.handleFileAnalysisStream(
-            req.file.buffer,
-            res,
-            req.file.originalname,
+          const {
             question,
-            analysisType
-          );
+            conversation_id,
+            user_id = "default_user",
+          } = req.body;
+          if (conversation_id) {
+            console.log("conversation_id 存在，使用现有对话");
+            await this.handleFileAnalysisStream(
+              req.file.buffer,
+              res,
+              req.file.originalname,
+              question,
+              analysisType,
+              { conversation_id, user_id }
+            );
+          } else {
+            console.log("conversation_id 不存在，创建新对话");
+            await this.handleFileAnalysisStream(
+              req.file.buffer,
+              res,
+              req.file.originalname,
+              question,
+              analysisType,
+              { user_id }
+            );
+          }
         } catch (error) {
           console.error(`${analysisType} 文件流式分析错误:`, error);
+          // 如果还没有设置响应头，先设置
+          if (!res.headersSent) {
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Headers": "Cache-Control",
+            });
+          }
           res.write(
             `data: ${JSON.stringify({
               type: "error",
@@ -186,9 +275,27 @@ class AnalysisService {
        */
       handleQuestionAnalysisStream: async (req, res) => {
         try {
-          const { question } = req.body;
+          console.log("handleQuestionAnalysisStream 开始执行");
+          const {
+            question,
+            conversation_id,
+            user_id = "default_user",
+          } = req.body;
+          console.log("从 req.body 获取的 question:", question);
+          console.log("从 req.body 获取的 conversation_id:", conversation_id);
+          console.log("从 req.body 获取的 user_id:", user_id);
+
+          // 首先设置流式响应头
+          res.writeHead(200, {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            Connection: "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
+          });
 
           if (!question) {
+            console.log("question 为空，返回错误");
             res.write(
               `data: ${JSON.stringify({
                 type: "error",
@@ -199,9 +306,30 @@ class AnalysisService {
             return;
           }
 
-          await this.handleTextAnalysisStream(question, res, analysisType);
+          if (conversation_id) {
+            console.log("conversation_id 存在，使用现有对话");
+            await this.handleTextAnalysisStream(question, res, analysisType, {
+              conversation_id,
+              user_id,
+            });
+          } else {
+            console.log("conversation_id 不存在，创建新对话");
+            await this.handleTextAnalysisStream(question, res, analysisType, {
+              user_id,
+            });
+          }
         } catch (error) {
           console.error(`${analysisType} 文本流式分析错误:`, error);
+          // 如果还没有设置响应头，先设置
+          if (!res.headersSent) {
+            res.writeHead(200, {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+              "Access-Control-Allow-Origin": "*",
+              "Access-Control-Allow-Headers": "Cache-Control",
+            });
+          }
           res.write(
             `data: ${JSON.stringify({
               type: "error",

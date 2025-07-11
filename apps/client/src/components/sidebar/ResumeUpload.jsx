@@ -11,15 +11,21 @@ const ResumeUpload = ({ selectedFile, onFileChange }) => {
         <div className="form-control w-full">
           <label className="label cursor-pointer mb-2">
             <span className="label-text">选择文件</span>
-            <span className="label-text-alt">支持 PDF、Word、TXT 格式</span>
+            <span className="label-text-alt">支持 PDF、Word、TXT、PNG、JPEG 格式</span>
           </label>
-          {!selectedFile && <input
-            type="file"
-            className="file-input file-input-bordered file-input-primary w-full"
-            accept=".pdf,.doc,.docx,.txt"
-            onChange={onFileChange}
-            disabled={!!selectedFile}
-          />}
+          {!selectedFile && (
+            <input
+              type="file"
+              className="file-input file-input-bordered file-input-primary w-full"
+              accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg"
+              onChange={e => {
+                if (e.target.files && e.target.files[0]) {
+                  onFileChange(e.target.files[0]);
+                }
+              }}
+              disabled={!!selectedFile}
+            />
+          )}
           {selectedFile && (
             <div className="alert alert-success mt-4">
               <svg
