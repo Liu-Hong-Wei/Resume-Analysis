@@ -43,7 +43,6 @@ const useChat = (userId) => {
     } catch (err) {
       console.error("获取对话列表失败:", err);
       setError(err.message);
-
     } finally {
       setIsLoading(false);
     }
@@ -128,6 +127,7 @@ const useChat = (userId) => {
               contentType: data.content_type || "text",
             };
             setMessages((prev) => [...prev, assistantMessage]);
+            setStreamingContent("");
           }
           break;
 
@@ -179,6 +179,7 @@ const useChat = (userId) => {
           message,
           analysisType,
           currentConversationId,
+          file: file ? file.name : null,
         });
 
         // 重置状态
@@ -189,14 +190,14 @@ const useChat = (userId) => {
         // 创建新的AbortController
         abortControllerRef.current = new AbortController();
 
-        // 添加用户消息到本地（如果有消息内容）
-        if (message?.trim()) {
+        // 添加用户消息到本地
+        if (message?.trim() || file) {
           const userMessage = {
             id: Date.now().toString(),
             role: "user",
-            content: message,
+            content: message || (file ? `[文件: ${file.name}]` : ""),
             timestamp: new Date().toISOString(),
-            contentType: "text",
+            contentType: file ? "file" : "text",
           };
           setMessages((prev) => [...prev, userMessage]);
         }
@@ -222,13 +223,9 @@ const useChat = (userId) => {
           console.log("请求被用户取消");
           return;
         }
-
       }
     },
-    [
-      currentConversationId,
-      handleStreamData,
-    ]
+    [currentConversationId, handleStreamData]
   );
 
   // 初始化：获取对话列表

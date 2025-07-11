@@ -40,6 +40,57 @@ class AnalysisService {
   }
 
   /**
+   * 处理文件分析（流式）- 使用文件ID
+   * @param {string} fileId - 文件ID
+   * @param {Response} res - Express响应对象
+   * @param {string} question - 问题内容（可选）
+   * @param {string} analysisType - 分析类型
+   * @param {Object} additionalVars - 额外的自定义变量
+   * @param {string} fileType - 文件类型（image/document）
+   * @returns {Promise<void>}
+   */
+  async handleFileIdAnalysisStream(
+    fileId,
+    res,
+    question,
+    analysisType,
+    additionalVars = {},
+    fileType = "document"
+  ) {
+    try {
+      this.validateAnalysisType(analysisType);
+
+      const customVariables = this.createCustomVariables(analysisType, {
+        ...additionalVars,
+      });
+
+      console.log(`开始文件ID流式分析:`, {
+        analysisType,
+        fileId,
+        hasQuestion: !!question,
+        fileType,
+      });
+
+      await this.cozeClient.analyzeFileIdStream(
+        fileId,
+        res,
+        question,
+        customVariables,
+        fileType
+      );
+    } catch (error) {
+      console.error(`文件ID流式分析失败 (${analysisType}):`, error);
+      res.write(
+        `data: ${JSON.stringify({
+          type: "error",
+          error: `${this.config.analysisTypeDescriptions[analysisType]}失败: ${error.message}`,
+        })}\n\n`
+      );
+      res.write("data: [DONE]\n\n");
+    }
+  }
+
+  /**
    * 处理文件分析（流式）
    * @param {Buffer} fileBuffer - 文件Buffer
    * @param {Response} res - Express响应对象
@@ -47,6 +98,7 @@ class AnalysisService {
    * @param {string} question - 问题内容（可选）
    * @param {string} analysisType - 分析类型
    * @param {Object} additionalVars - 额外的自定义变量
+   * @param {string} mimeType - 文件MIME类型
    * @returns {Promise<void>}
    */
   async handleFileAnalysisStream(
@@ -55,21 +107,23 @@ class AnalysisService {
     fileName,
     question,
     analysisType,
-    additionalVars = {}
+    additionalVars = {},
+    mimeType = null
   ) {
     try {
       this.validateAnalysisType(analysisType);
 
-      const customVariables = this.createCustomVariables(
-        analysisType,
-        additionalVars
-      );
+      const customVariables = this.createCustomVariables(analysisType, {
+        ...additionalVars,
+        mimeType,
+      });
 
       console.log(`开始文件流式分析:`, {
         analysisType,
         fileName,
         fileSize: fileBuffer.length,
         hasQuestion: !!question,
+        mimeType,
       });
 
       await this.cozeClient.analyzeFileStream(
@@ -211,42 +265,44 @@ class AnalysisService {
             "Access-Control-Allow-Headers": "Cache-Control",
           });
 
-          if (!req.file) {
-            res.write(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "请上传文件",
-              })}\n\n`
-            );
-            res.write("data: [DONE]\n\n");
-            return;
-          }
-
           const {
+            file_id,
             question,
             conversation_id,
             user_id = "default_user",
           } = req.body;
-          if (conversation_id) {
-            console.log("conversation_id 存在，使用现有对话");
+
+          // 检查是使用file_id模式还是文件上传模式
+          if (file_id) {
+            console.log("检测到file_id，使用文件ID模式");
+            console.log("file_id:", file_id);
+
+            // 检测文件类型 - 可以根据扩展名或其他方式判断
+            const fileType = "document"; // 默认为文档类型
+
+            await this.handleFileIdAnalysisStream(
+              file_id,
+              res,
+              question,
+              analysisType,
+              { conversation_id, user_id },
+              fileType
+            );
+          } else if (req.file) {
+            console.log("检测到文件上传，使用传统文件上传模式");
+            console.log("文件名:", req.file.originalname);
+
             await this.handleFileAnalysisStream(
               req.file.buffer,
               res,
               req.file.originalname,
               question,
               analysisType,
-              { conversation_id, user_id }
+              { conversation_id, user_id },
+              req.file.mimetype
             );
           } else {
-            console.log("conversation_id 不存在，创建新对话");
-            await this.handleFileAnalysisStream(
-              req.file.buffer,
-              res,
-              req.file.originalname,
-              question,
-              analysisType,
-              { user_id }
-            );
+            throw new Error("请提供file_id或上传文件");
           }
         } catch (error) {
           console.error(`${analysisType} 文件流式分析错误:`, error);

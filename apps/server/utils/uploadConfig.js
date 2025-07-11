@@ -9,15 +9,26 @@ export const upload = multer({
     fileSize: 25 * 1024 * 1024, // 25MB
   },
   fileFilter: (req, file, cb) => {
-    if (
-      file.mimetype === "application/pdf" ||
-      file.mimetype === "image/png" ||
-      file.mimetype === "image/jpeg" ||
-      file.mimetype === "image/jpg"
-    ) {
+    const supportedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg", // 兼容性支持
+      "image/png",
+      "image/gif",
+      "image/bmp",
+      "image/webp",
+      "text/plain",
+    ];
+
+    if (supportedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error("只支持PDF文件或图片（PNG、JPG、JPEG）"), false);
+      cb(
+        new Error(
+          `不支持的文件类型: ${file.mimetype}。支持的类型: PDF、图片（JPG、PNG、GIF、BMP、WEBP）、TXT`
+        ),
+        false
+      );
     }
   },
 });

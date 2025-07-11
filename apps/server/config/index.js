@@ -1,12 +1,8 @@
 import dotenv from "dotenv";
-import path from "path";
-import { fileURLToPath } from "url";
+
 
 // 加载环境变量
 dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 /**
  * 配置管理类
@@ -41,7 +37,6 @@ class ConfigManager {
   get server() {
     return {
       PORT: parseInt(process.env.PORT) || 3000,
-      UPLOAD_DIR: path.join(__dirname, "..", "uploads"),
       MAX_FILE_SIZE: 25 * 1024 * 1024, // 25MB
       NODE_ENV: process.env.NODE_ENV || "development",
       CORS_ORIGIN: process.env.CORS_ORIGIN || "*",
@@ -81,12 +76,34 @@ class ConfigManager {
     return {
       MAX_FILE_SIZE: 20 * 1024 * 1024, // 20MB (根据 Coze 文档)
       SUPPORTED_TYPES: [
+        // PDF文档
         "application/pdf",
+        // 图片格式
         "image/jpeg",
+        "image/jpg", // 某些浏览器可能使用这个（非标准但常见）
         "image/png",
         "image/gif",
+        "image/bmp",
+        "image/webp",
+        // 文本格式
+        "text/plain",
       ],
-      SUPPORTED_EXTENSIONS: [".pdf", ".jpg", ".jpeg", ".png", ".gif"],
+      SUPPORTED_EXTENSIONS: [
+        ".pdf", 
+        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
+        ".txt"
+      ],
+      // MIME类型映射 - 用于根据扩展名推断MIME类型
+      MIME_TYPE_MAP: {
+        ".pdf": "application/pdf",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg", 
+        ".png": "image/png",
+        ".gif": "image/gif",
+        ".bmp": "image/bmp",
+        ".webp": "image/webp",
+        ".txt": "text/plain",
+      },
     };
   }
 

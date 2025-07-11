@@ -1,27 +1,30 @@
 // API 配置
-const API_BASE_URL = "http://localhost:3000";
-
-// 分析类型常量
-import { ANALYSIS_TYPES } from "../pages/Analysis";
+import { configManager } from "../../../server/config/index";
 
 /**
  * API 客户端类
  */
 class ApiClient {
-  constructor(baseURL = API_BASE_URL) {
-    this.baseURL = baseURL;
+  constructor() {
+    this.baseURL = configManager.server.API_BASE_URL;
+    this.apiKey = configManager.coze.API_KEY;
   }
 
   /**
    * 创建请求头
    * @param {Object} additionalHeaders - 额外的请求头
+   * @param {boolean} isFormData - 是否为FormData请求
    * @returns {Object} 请求头对象
    */
-  createHeaders(additionalHeaders = {}) {
-    return {
-      "Content-Type": "application/json",
-      ...additionalHeaders,
-    };
+  createHeaders(additionalHeaders = {}, isFormData = false) {
+    const headers = { ...additionalHeaders };
+
+    // 只有在非FormData请求时才设置Content-Type
+    if (!isFormData) {
+      headers["Content-Type"] = "application/json";
+    }
+
+    return headers;
   }
 
   /**
@@ -32,9 +35,13 @@ class ApiClient {
    */
   async request(endpoint, options = {}) {
     const url = `${this.baseURL}${endpoint}`;
+
+    // 检查是否为FormData请求
+    const isFormData = options.body instanceof FormData;
+
     const response = await fetch(url, {
       ...options,
-      headers: this.createHeaders(options.headers),
+      headers: this.createHeaders(options.headers, isFormData),
     });
 
     if (!response.ok) {
@@ -507,6 +514,109 @@ class ApiClient {
   }
 
   /**
+   * 上传文件
+   * @param {File} file - 文件内容
+   * @param {string} fileName - 文件名
+   * @param {string} mimeType - 文件MIME类型（可选，会自动推断）
+   * @returns {Promise<string>} 文件ID
+   */
+  async uploadFile(file, fileName, mimeType = null) {
+    try {
+      const uploadUrl = `https://api.coze.cn/v1/files/upload`;
+
+      // 如果没有提供MIME类型，尝试从文件名推断
+      const finalMimeType = mimeType || this.inferMimeType(fileName);
+
+      // 验证 MIME 类型是否支持
+      const supportedTypes = [
+        "application/pdf",
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "text/plain",
+      ];
+
+      if (!supportedTypes.includes(finalMimeType)) {
+        throw new Error(
+          `不支持的文件类型：${finalMimeType}。支持的格式：${supportedTypes.join(", ")}`
+        );
+      }
+
+      console.log("开始上传文件到 Coze:", {
+        fileName,
+        mimeType: finalMimeType,
+        fileSize: file.size,
+      });
+
+      // 发送请求 - 使用指定的请求头格式
+      const response = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": `multipart/form-data`,
+        },
+        body: file,
+      });
+
+      if (!response.ok) {
+        throw await this.handleError(response);
+      }
+
+      const data = await response.json();
+
+      // 根据官方文档，检查响应的code字段
+      if (data.code !== 0) {
+        const errorMsg = data.msg || data.message || "文件上传失败";
+        throw new Error(`Coze API 错误 (code: ${data.code}): ${errorMsg}`);
+      }
+
+      console.log("文件上传成功:", {
+        file_id: data.data?.id,
+        filename: data.data?.file_name || fileName,
+        bytes: data.data?.bytes,
+        created_at: data.data?.created_at,
+      });
+
+      if (!data.data?.id) {
+        throw new Error("文件上传失败：响应中未返回文件ID");
+      }
+
+      return data.data.id;
+    } catch (error) {
+      console.error("文件上传失败:", {
+        fileName,
+        fileSize: fileBuffer.length,
+        error: error.message,
+        stack: error.stack,
+      });
+
+      // 提供更友好的错误信息
+      if (
+        error.message.includes("413") ||
+        error.message.includes("Payload Too Large")
+      ) {
+        throw new Error(
+          `文件太大，无法上传。最大支持 20MB，当前文件: ${Math.round((fileBuffer.length / 1024 / 1024) * 100) / 100}MB`
+        );
+      } else if (
+        error.message.includes("401") ||
+        error.message.includes("认证失败")
+      ) {
+        throw new Error("API 密钥无效，请检查 Coze API 配置");
+      } else if (
+        error.message.includes("415") ||
+        error.message.includes("Unsupported Media Type")
+      ) {
+        throw new Error(
+          `不支持的文件类型。支持的格式: PDF、图片（JPG、PNG、GIF、BMP、WEBP）、TXT`
+        );
+      }
+
+      throw error;
+    }
+  }
+
+  /**
    * 发送消息到对话（流式）
    * @param {string} conversationId - 对话ID
    * @param {string} message - 消息内容
@@ -528,7 +638,8 @@ class ApiClient {
       if (file) {
         // 文件上传模式
         const formData = new FormData();
-        formData.append("file", file);
+        const fileId = await this.uploadFile(file, file.name, file.type);
+        formData.append("file_id", fileId);
         formData.append("analysis_type", analysisType);
         if (message) {
           formData.append("question", message);

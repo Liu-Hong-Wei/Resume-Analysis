@@ -1,4 +1,5 @@
 import { COZE_CONFIG } from "../config/index.js";
+import FormData from "form-data";
 
 /**
  * Coze API 客户端类
@@ -130,58 +131,23 @@ class CozeClient {
   }
 
   /**
-   * 上传文件
-   * @param {Buffer} fileBuffer - 文件Buffer内容
+   * 根据文件名推断MIME类型
    * @param {string} fileName - 文件名
-   * @param {string} mimeType - 文件MIME类型
-   * @returns {Promise<string>} 文件ID
+   * @returns {string} MIME类型
    */
-  async uploadFile(fileBuffer, fileName, mimeType = "application/pdf") {
-    try {
-      const uploadUrl = `${this.baseURL}/v1/files/upload`;
+  inferMimeType(fileName) {
+    const extension = fileName
+      .toLowerCase()
+      .substring(fileName.lastIndexOf("."));
+    const mimeTypeMap = {
+      ".pdf": "application/pdf",
+      ".jpg": "image/jpeg",
+      ".jpeg": "image/jpeg",
+      ".png": "image/png",
+      ".txt": "text/plain",
+    };
 
-      console.log("开始上传文件到 Coze:", {
-        fileName,
-        mimeType,
-        fileSize: fileBuffer.length,
-      });
-
-      const formData = new FormData();
-      formData.append("file", fileBuffer, {
-        filename: fileName,
-        contentType: mimeType,
-      });
-
-      const response = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "User-Agent": "Resume-Analysis-API/1.0",
-          ...formData.getHeaders(),
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw await this.handleError(response);
-      }
-
-      const data = await response.json();
-      console.log("文件上传成功:", {
-        file_id: data.data?.id,
-        filename: fileName,
-        bytes: data.data?.bytes,
-      });
-
-      if (!data.data?.id) {
-        throw new Error("文件上传失败：未返回文件ID");
-      }
-
-      return data.data.id;
-    } catch (error) {
-      console.error("文件上传失败:", error);
-      throw error;
-    }
+    return mimeTypeMap[extension] || "application/octet-stream";
   }
 
   /**
@@ -216,32 +182,40 @@ class CozeClient {
    * 构建文件消息
    * @param {string} fileId - 文件ID
    * @param {string} text - 文本内容（可选）
+   * @param {string} fileType - 文件类型（image/document）
    * @returns {Object} 消息对象
    */
-  buildFileMessage(fileId, text = null) {
+  buildFileMessage(fileId, text = null, fileType = "document") {
     const message = {
       role: "user",
       content_type: "object_string",
-      content: JSON.stringify({
-        type: "file",
-        file_id: fileId,
-      }),
     };
 
-    // 如果有附加文本，创建复合消息
+    // 构建内容数组，确保始终是数组格式
+    const content = [];
+
+    // 如果有文本内容，先添加文本
     if (text) {
-      message.content = JSON.stringify([
-        {
-          type: "text",
-          text: text,
-        },
-        {
-          type: "file",
-          file_id: fileId,
-        },
-      ]);
+      content.push({
+        type: "text",
+        text: text,
+      });
     }
 
+    // 根据文件类型添加文件
+    if (fileType === "image") {
+      content.push({
+        type: "image",
+        file_id: fileId,
+      });
+    } else {
+      content.push({
+        type: "file",
+        file_id: fileId,
+      });
+    }
+
+    message.content = JSON.stringify(content);
     return message;
   }
 
@@ -321,6 +295,7 @@ class CozeClient {
         user_id: userId,
       };
 
+      // TODO: 检验用户是否存在
       const response = await this.request(`${this.baseURL}/v1/conversations`, {
         method: "POST",
         body: JSON.stringify(requestBody),
@@ -693,6 +668,101 @@ class CozeClient {
   }
 
   /**
+   * 检测文件类型
+   * @param {string} fileName - 文件名
+   * @param {string} mimeType - MIME类型
+   * @returns {string} 文件类型 (image/document)
+   */
+  detectFileType(fileName, mimeType) {
+    const imageExtensions = [".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"];
+    const imageMimeTypes = [
+      "image/jpeg",
+      "image/jpg", // 兼容性支持
+      "image/png",
+      "image/gif",
+      "image/bmp",
+      "image/webp",
+    ];
+
+    const fileExtension = fileName
+      .toLowerCase()
+      .substring(fileName.lastIndexOf("."));
+
+    if (
+      imageExtensions.includes(fileExtension) ||
+      imageMimeTypes.includes(mimeType)
+    ) {
+      return "image";
+    }
+
+    return "document";
+  }
+
+  /**
+   * 分析简历（流式）- 使用文件ID
+   * @param {string} fileId - 文件ID
+   * @param {Response} res - Express响应对象
+   * @param {string} text - 文本内容（可选）
+   * @param {Object} customVariables - 自定义变量
+   * @param {string} fileType - 文件类型（image/document）
+   * @returns {Promise<void>}
+   */
+  async analyzeFileIdStream(
+    fileId,
+    res,
+    text = null,
+    customVariables = {},
+    fileType = "document"
+  ) {
+    try {
+      console.log("analyzeFileIdStream 开始执行");
+      console.log("参数:", { fileId, text, customVariables, fileType });
+
+      // 如果提供了conversation_id，使用它；否则创建新的对话
+      let conversationId = customVariables.conversation_id;
+      if (!conversationId) {
+        conversationId = await this.createConversation();
+        console.log("对话ID创建完成:", conversationId);
+
+        // 发送对话创建事件到前端
+        res.write(
+          `data: ${JSON.stringify({
+            type: "conversation_created",
+            conversation_id: conversationId,
+          })}\n\n`
+        );
+      } else {
+        console.log("使用现有对话ID:", conversationId);
+      }
+
+      console.log("使用文件ID构建消息:", fileId);
+      const message = this.buildFileMessage(fileId, text, fileType);
+      console.log("消息构建完成:", message);
+
+      const response = await this.sendChatRequest(conversationId, message, {
+        stream: true,
+        customVariables,
+      });
+
+      console.log("开始处理流式响应");
+      await this.handleStreamResponse(response, (data) => {
+        // 立即转发数据到前端
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      });
+
+      // 确保发送结束信号
+      console.log("文件ID流式响应处理完成，发送最终结束信号");
+      res.write("data: [DONE]\n\n");
+    } catch (error) {
+      console.error("文件ID流式分析失败:", error);
+      res.write(
+        `data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`
+      );
+      res.write("data: [DONE]\n\n");
+    }
+  }
+
+  /**
    * 分析简历（流式）- 文件模式
    * @param {Buffer} fileBuffer - 文件Buffer
    * @param {Response} res - Express响应对象
@@ -712,9 +782,6 @@ class CozeClient {
       console.log("analyzeFileStream 开始执行");
       console.log("参数:", { fileName, text, customVariables });
 
-      const fileId = await this.uploadFile(fileBuffer, fileName);
-      console.log("文件上传完成，文件ID:", fileId);
-
       // 如果提供了conversation_id，使用它；否则创建新的对话
       let conversationId = customVariables.conversation_id;
       if (!conversationId) {
@@ -732,7 +799,21 @@ class CozeClient {
         console.log("使用现有对话ID:", conversationId);
       }
 
-      const message = this.buildFileMessage(fileId, text);
+      // 检测文件类型
+      const fileType = this.detectFileType(
+        fileName,
+        customVariables.mimeType || ""
+      );
+      console.log("检测到文件类型:", fileType);
+
+      const fileId = await this.uploadFile(
+        fileBuffer,
+        fileName,
+        customVariables.mimeType
+      );
+      console.log("文件上传完成，文件ID:", fileId);
+
+      const message = this.buildFileMessage(fileId, text, fileType);
       console.log("消息构建完成:", message);
 
       const response = await this.sendChatRequest(conversationId, message, {

@@ -136,12 +136,15 @@ function Analysis() {
           <div className="card-body p-0">
             <ChatInterface
               messages={messages}
-              onSendMessage={(message) =>
+              onSendMessage={(message, selectedFile) =>
                 sendMessage(message, analysisType, selectedFile || null)
               }
               streamingContent={streamingContent}
               isStreaming={isStreaming}
               analysisType={analysisType}
+              file={selectedFile}
+              onFileSelect={handleFileChange}
+              onRemoveFile={resetAnalysis}
               currentConversation={
                 currentConversationId ? { id: currentConversationId } : null
               }
