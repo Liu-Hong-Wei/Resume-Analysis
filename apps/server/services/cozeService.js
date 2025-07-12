@@ -191,10 +191,9 @@ class CozeClient {
       content_type: "object_string",
     };
 
-    // 构建内容数组，确保始终是数组格式
+    // 按照用户提供的格式构建多模态消息
     const content = [];
 
-    // 如果有文本内容，先添加文本
     if (text) {
       content.push({
         type: "text",
@@ -202,13 +201,14 @@ class CozeClient {
       });
     }
 
-    // 根据文件类型添加文件
     if (fileType === "image") {
+      // 图片类型
       content.push({
         type: "image",
         file_id: fileId,
       });
     } else {
+      // 文档类型
       content.push({
         type: "file",
         file_id: fileId,
@@ -699,72 +699,8 @@ class CozeClient {
   }
 
   /**
-   * 分析简历（流式）- 使用文件ID
-   * @param {string} fileId - 文件ID
-   * @param {Response} res - Express响应对象
-   * @param {string} text - 文本内容（可选）
-   * @param {Object} customVariables - 自定义变量
-   * @param {string} fileType - 文件类型（image/document）
-   * @returns {Promise<void>}
-   */
-  async analyzeFileIdStream(
-    fileId,
-    res,
-    text = null,
-    customVariables = {},
-    fileType = "document"
-  ) {
-    try {
-      console.log("analyzeFileIdStream 开始执行");
-      console.log("参数:", { fileId, text, customVariables, fileType });
-
-      // 如果提供了conversation_id，使用它；否则创建新的对话
-      let conversationId = customVariables.conversation_id;
-      if (!conversationId) {
-        conversationId = await this.createConversation();
-        console.log("对话ID创建完成:", conversationId);
-
-        // 发送对话创建事件到前端
-        res.write(
-          `data: ${JSON.stringify({
-            type: "conversation_created",
-            conversation_id: conversationId,
-          })}\n\n`
-        );
-      } else {
-        console.log("使用现有对话ID:", conversationId);
-      }
-
-      console.log("使用文件ID构建消息:", fileId);
-      const message = this.buildFileMessage(fileId, text, fileType);
-      console.log("消息构建完成:", message);
-
-      const response = await this.sendChatRequest(conversationId, message, {
-        stream: true,
-        customVariables,
-      });
-
-      console.log("开始处理流式响应");
-      await this.handleStreamResponse(response, (data) => {
-        // 立即转发数据到前端
-        res.write(`data: ${JSON.stringify(data)}\n\n`);
-      });
-
-      // 确保发送结束信号
-      console.log("文件ID流式响应处理完成，发送最终结束信号");
-      res.write("data: [DONE]\n\n");
-    } catch (error) {
-      console.error("文件ID流式分析失败:", error);
-      res.write(
-        `data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`
-      );
-      res.write("data: [DONE]\n\n");
-    }
-  }
-
-  /**
    * 分析简历（流式）- 文件模式
-   * @param {Buffer} fileBuffer - 文件Buffer
+   * @param {string} fileId - 文件ID
    * @param {Response} res - Express响应对象
    * @param {string} fileName - 文件名
    * @param {string} text - 文本内容（可选）
@@ -772,7 +708,7 @@ class CozeClient {
    * @returns {Promise<void>}
    */
   async analyzeFileStream(
-    fileBuffer,
+    fileId,
     res,
     fileName,
     text = null,
@@ -806,12 +742,6 @@ class CozeClient {
       );
       console.log("检测到文件类型:", fileType);
 
-      const fileId = await this.uploadFile(
-        fileBuffer,
-        fileName,
-        customVariables.mimeType
-      );
-      console.log("文件上传完成，文件ID:", fileId);
 
       const message = this.buildFileMessage(fileId, text, fileType);
       console.log("消息构建完成:", message);
@@ -832,6 +762,68 @@ class CozeClient {
       res.write("data: [DONE]\n\n");
     } catch (error) {
       console.error("文件流式分析失败:", error);
+      res.write(
+        `data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`
+      );
+      res.write("data: [DONE]\n\n");
+    }
+  }
+
+  /**
+   * 分析简历（流式）- 文件ID模式
+   * @param {string} fileId - 文件ID
+   * @param {Response} res - Express响应对象
+   * @param {string} text - 文本内容（可选）
+   * @param {Object} customVariables - 自定义变量
+   * @returns {Promise<void>}
+   */
+  async analyzeFileWithIdStream(
+    fileId,
+    res,
+    text = null,
+    customVariables = {}
+  ) {
+    try {
+      console.log("analyzeFileWithIdStream 开始执行");
+      console.log("参数:", { fileId, text, customVariables });
+
+      // 如果提供了conversation_id，使用它；否则创建新的对话
+      let conversationId = customVariables.conversation_id;
+      if (!conversationId) {
+        conversationId = await this.createConversation();
+        console.log("对话ID创建完成:", conversationId);
+
+        // 发送对话创建事件到前端
+        res.write(
+          `data: ${JSON.stringify({
+            type: "conversation_created",
+            conversation_id: conversationId,
+          })}\n\n`
+        );
+      } else {
+        console.log("使用现有对话ID:", conversationId);
+      }
+
+      // 构建文件消息
+      const message = this.buildFileMessage(fileId, text, "document");
+      console.log("消息构建完成:", message);
+
+      const response = await this.sendChatRequest(conversationId, message, {
+        stream: true,
+        customVariables,
+      });
+
+      console.log("开始处理流式响应");
+      await this.handleStreamResponse(response, (data) => {
+        // 立即转发数据到前端
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      });
+
+      // 确保发送结束信号
+      console.log("文件ID流式响应处理完成，发送最终结束信号");
+      res.write("data: [DONE]\n\n");
+    } catch (error) {
+      console.error("文件ID流式分析失败:", error);
       res.write(
         `data: ${JSON.stringify({ type: "error", error: error.message })}\n\n`
       );

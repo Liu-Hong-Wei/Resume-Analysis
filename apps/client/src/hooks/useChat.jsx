@@ -210,7 +210,8 @@ const useChat = (userId) => {
           analysisType,
           handleStreamData,
           abortControllerRef.current.signal,
-          file
+          file,
+          userId
         );
 
         console.log("消息发送完成:", result);

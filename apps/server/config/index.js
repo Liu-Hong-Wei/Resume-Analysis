@@ -82,15 +82,12 @@ class ConfigManager {
         "image/jpeg",
         "image/jpg", // 某些浏览器可能使用这个（非标准但常见）
         "image/png",
-        "image/gif",
-        "image/bmp",
-        "image/webp",
         // 文本格式
         "text/plain",
       ],
       SUPPORTED_EXTENSIONS: [
         ".pdf", 
-        ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp",
+        ".jpg", ".jpeg", ".png",
         ".txt"
       ],
       // MIME类型映射 - 用于根据扩展名推断MIME类型
@@ -99,9 +96,6 @@ class ConfigManager {
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg", 
         ".png": "image/png",
-        ".gif": "image/gif",
-        ".bmp": "image/bmp",
-        ".webp": "image/webp",
         ".txt": "text/plain",
       },
     };

@@ -1,5 +1,6 @@
 import { Outlet, Link, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import UserMenu from "../components/UserMenu";
 
 function NavLayout() {
   const location = useLocation();
@@ -131,50 +132,7 @@ function NavLayout() {
 
         {/* 用户菜单 */}
         <div className="navbar-end">
-          <div className="dropdown dropdown-end">
-            <div
-              tabIndex={0}
-              role="button"
-              className="btn btn-ghost btn-circle avatar hover:ring-2 hover:ring-primary/20 transition-all duration-200"
-            >
-              <div className="w-10 h-10 rounded-full ring-2 ring-base-300 hover:ring-primary/50 transition-all duration-200">
-                <img
-                  alt="用户头像"
-                  src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&h=150&fit=crop&crop=face"
-                  className="object-cover"
-                />
-              </div>
-            </div>
-            <ul
-              tabIndex={0}
-              className="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow-xl bg-base-100/95 backdrop-blur-md rounded-box w-56 border border-base-300/20 dropdown-animate-in"
-            >
-              <li className="menu-title">
-                <span className="text-sm font-medium text-base-content/60">
-                  用户菜单
-                </span>
-              </li>
-              <li>
-                <a className="flex items-center gap-3 p-3 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200">
-                  <span className="text-lg">👤</span>
-                  <span>个人资料</span>
-                </a>
-              </li>
-              <li>
-                <a className="flex items-center gap-3 p-3 rounded-lg hover:bg-primary/10 hover:text-primary transition-all duration-200">
-                  <span className="text-lg">⚙️</span>
-                  <span>设置</span>
-                </a>
-              </li>
-              <div className="divider my-1"></div>
-              <li>
-                <a className="flex items-center gap-3 p-3 rounded-lg hover:bg-error/10 hover:text-error transition-all duration-200">
-                  <span className="text-lg">🚪</span>
-                  <span>退出登录</span>
-                </a>
-              </li>
-            </ul>
-          </div>
+          <UserMenu />
         </div>
       </div>
 

@@ -2,6 +2,7 @@
  * 分析页面组件
  */
 import React, { useEffect, useState } from "react";
+import { useUser } from "@clerk/clerk-react";
 import { useAnalysis } from "../hooks/useAnalysis";
 import useChat from "../hooks/useChat";
 import { apiClient } from "../services/apiService";
@@ -34,14 +35,24 @@ export const ANALYSIS_TYPES = [
 ];
 
 function Analysis() {
-  // 假设已经获得userId，这里使用一个示例值
-  const [currentUserId] = useState("user_123");
+  // 使用Clerk hooks获取用户信息
+  const { user, isLoaded } = useUser();
+
+  // 如果用户信息还在加载中，显示加载状态
+  if (!isLoaded) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <span className="loading loading-spinner loading-lg"></span>
+      </div>
+    );
+  }
 
   // 使用hooks
   const {
     selectedFile,
     analysisType,
     error: analysisError,
+    fileId,
 
     handleFileChange,
     handleAnalysisTypeChange,
@@ -60,7 +71,7 @@ function Analysis() {
     switchConversation,
     sendMessage,
     handleErrorClose: handleChatErrorClose,
-  } = useChat(currentUserId);
+  } = useChat(user?.id);
 
   // 处理错误
   const error = analysisError || chatError;
@@ -86,9 +97,9 @@ function Analysis() {
   };
 
   return (
-    <div className="flex flex-col min-h-[92vh] mx-auto px-4 pt-4 xl:flex-row gap-4 basis-11/12 flex-1">
+    <div className="flex flex-col min-h-[92vh] mx-auto px-4 pt-4 xl:flex-row gap-2 basis-11/12 flex-1">
       {/* 左侧：上传和分析设置 */}
-      <div className="xl:w-1/4 space-y-6">
+      <div className="xl:w-1/4 space-y-2">
         {/* 错误提示 */}
         <ErrorAlert error={error} onClose={handleErrorClose} />
 
@@ -102,6 +113,7 @@ function Analysis() {
         <ResumeUpload
           selectedFile={selectedFile}
           onFileChange={handleFileChange}
+          fileId={fileId}
         />
 
         {/* 文件信息 */}

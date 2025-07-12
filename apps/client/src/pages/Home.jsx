@@ -1,4 +1,7 @@
+import { useNavigate } from "react-router-dom";
+
 function Home() {
+  const navigate = useNavigate();
   const features = [
     {
       icon: "📄",
@@ -34,8 +37,10 @@ function Home() {
               助您在求职路上脱颖而出
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <button className="btn btn-primary">开始分析</button>
-              <button className="btn btn-outline btn-secondary">
+              <button className="btn btn-primary" onClick={() => navigate("/login")}>
+                开始分析
+              </button>
+              <button className="btn btn-outline btn-secondary" onClick={() => navigate("/about")}>
                 了解更多
               </button>
             </div>
@@ -144,7 +149,9 @@ function Home() {
               我们拥有先进的AI技术和专业的分析团队，能够为您提供最准确、最全面的简历分析服务。
               无论您是应届毕业生还是职场老手，我们都能帮助您优化简历，提升求职竞争力。
             </p>
-            <button className="btn btn-primary">立即体验</button>
+            <button className="btn btn-primary" onClick={() => navigate("/login")}>
+              立即体验
+            </button>
           </div>
         </div>
       </div>

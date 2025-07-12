@@ -1,7 +1,6 @@
 import express from "express";
 import { analysisService } from "../services/analysisService.js";
 import { configManager } from "../config/index.js";
-import { upload } from "../utils/uploadConfig.js";
 
 const router = express.Router();
 
@@ -27,9 +26,8 @@ class RouteManager {
       // 文件分析（流式）
       [`/${analysisType}-resume-stream`]: {
         method: "POST",
-        middleware: [handler.upload.single("file")],
         handler: handler.handleFileAnalysisStream,
-        description: `${typeName} - 文件上传模式（流式）`,
+        description: `${typeName} - 文件ID模式（流式）`,
       },
 
       // 文本分析（流式）
@@ -46,23 +44,7 @@ class RouteManager {
    * @param {express.Router} router - Express 路由对象
    */
   registerAnalysisRoutes(router) {
-    // 先定义一个中间件来条件性地应用文件上传处理
-    const conditionalUpload = (req, res, next) => {
-      // 检查 Content-Type 是否为 multipart/form-data（文件上传）
-      const contentType = req.headers["content-type"] || "";
-
-      if (contentType.includes("multipart/form-data")) {
-        // 如果是文件上传，使用 multer 中间件
-        console.log("检测到文件上传请求，应用 multer 中间件");
-        upload.single("file")(req, res, next);
-      } else {
-        // 如果不是文件上传，直接跳过
-        console.log("检测到JSON请求，跳过文件上传中间件");
-        next();
-      }
-    };
-
-    router.post("/analyze", conditionalUpload, async (req, res) => {
+    router.post("/analyze", async (req, res) => {
       try {
         const {
           analysis_type,
@@ -71,14 +53,12 @@ class RouteManager {
           file_id,
           question,
         } = req.body;
-
         console.log("--------------------------------");
         console.log("req.body: ", req.body);
         console.log("analysis_type: ", analysis_type);
         console.log("conversation_id: ", conversation_id);
         console.log("file_id: ", file_id);
         console.log("question: ", question);
-        console.log("有文件上传: ", !!req.file);
         console.log("--------------------------------");
 
         if (!analysis_type) {
@@ -91,20 +71,15 @@ class RouteManager {
         const handler =
           this.analysisService.createAnalysisHandler(analysis_type);
 
-        // 判断请求类型并处理
-        if (file_id || req.file) {
-          console.log("进入文件分析模式");
-          // 文件分析模式（支持file_id和文件上传）
+        // 只支持流式分析
+        if (file_id) {
+          console.log("进入文件ID模式");
+          // 文件ID模式（流式）
           await handler.handleFileAnalysisStream(req, res);
-        } else if (question) {
+        } else {
           console.log("进入文本模式");
           // 文本模式（流式）
           await handler.handleQuestionAnalysisStream(req, res);
-        } else {
-          return res.status(400).json({
-            error: "请提供file_id、文件上传或question参数",
-            timestamp: new Date().toISOString(),
-          });
         }
       } catch (error) {
         console.error("统一分析接口错误:", error);
@@ -259,18 +234,7 @@ class RouteManager {
           `注册路由: ${routeConfig.method} ${fullPath} - ${routeConfig.description}`
         );
 
-        if (routeConfig.middleware && routeConfig.middleware.length > 0) {
-          router[routeConfig.method.toLowerCase()](
-            fullPath,
-            ...routeConfig.middleware,
-            routeConfig.handler
-          );
-        } else {
-          router[routeConfig.method.toLowerCase()](
-            fullPath,
-            routeConfig.handler
-          );
-        }
+        router[routeConfig.method.toLowerCase()](fullPath, routeConfig.handler);
       });
     });
   }

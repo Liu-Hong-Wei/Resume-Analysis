@@ -14,9 +14,6 @@ export const upload = multer({
       "image/jpeg",
       "image/jpg", // 兼容性支持
       "image/png",
-      "image/gif",
-      "image/bmp",
-      "image/webp",
       "text/plain",
     ];
 
@@ -25,7 +22,7 @@ export const upload = multer({
     } else {
       cb(
         new Error(
-          `不支持的文件类型: ${file.mimetype}。支持的类型: PDF、图片（JPG、PNG、GIF、BMP、WEBP）、TXT`
+          `不支持的文件类型: ${file.mimetype}。支持的类型: PDF、图片（JPG、PNG）、TXT`
         ),
         false
       );

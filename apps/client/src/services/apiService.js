@@ -1,13 +1,21 @@
 // API 配置
-import { configManager } from "../../../server/config/index";
+import clientConfig from "../config/index.js";
+import {
+  CozeAPI,
+  getWebOAuthToken,
+  getPKCEOAuthToken,
+  getWebAuthenticationUrl,
+  getPKCEAuthenticationUrl,
+} from "@coze/api";
 
 /**
  * API 客户端类
  */
 class ApiClient {
   constructor() {
-    this.baseURL = configManager.server.API_BASE_URL;
-    this.apiKey = configManager.coze.API_KEY;
+    this.baseURL = clientConfig.server.API_BASE_URL;
+    this.apiKey = clientConfig.coze.API_KEY;
+    console.log("APIKey", this.apiKey);
   }
 
   /**
@@ -148,9 +156,10 @@ class ApiClient {
    * @param {Object} data - 分析数据
    * @param {Function} onData - 数据回调函数
    * @param {AbortSignal} signal - 取消信号（可选）
+   * @param {string} userId - 用户ID（可选）
    * @returns {Promise<Object>} 流式响应处理结果
    */
-  async analyzeStream(data, onData, signal = null) {
+  async analyzeStream(data, onData, signal = null, userId = null) {
     try {
       const { analysis_type, question, file, conversation_id } = data;
 
@@ -165,12 +174,19 @@ class ApiClient {
         if (conversation_id) {
           formData.append("conversation_id", conversation_id);
         }
+        if (userId) {
+          formData.append("user_id", userId);
+        }
 
-        const response = await this.request(`/api/analyze`, {
-          method: "POST",
-          body: formData,
-          signal, // 添加 AbortSignal
-        });
+        const response = await this.request(
+          `/api/analyze`,
+          {
+            method: "POST",
+            body: formData,
+            signal, // 添加 AbortSignal
+          },
+          userId
+        );
 
         if (!response.ok) {
           throw await this.handleError(response);
@@ -188,11 +204,19 @@ class ApiClient {
           requestBody.conversation_id = conversation_id;
         }
 
-        const response = await this.request(`/api/analyze`, {
-          method: "POST",
-          body: JSON.stringify(requestBody),
-          signal, // 添加 AbortSignal
-        });
+        if (userId) {
+          requestBody.user_id = userId;
+        }
+
+        const response = await this.request(
+          `/api/analyze`,
+          {
+            method: "POST",
+            body: JSON.stringify(requestBody),
+            signal, // 添加 AbortSignal
+          },
+          userId
+        );
 
         return await this.handleStreamResponse(response, onData, signal);
       }
@@ -306,6 +330,9 @@ class ApiClient {
 
   /**
    * 处理SSE事件
+   * SSE（Server-Sent Events，服务器发送事件）是一种允许服务器通过HTTP协议单向推送实时数据到浏览器的技术。
+   * 在本方法中，根据不同的SSE事件类型，对接收到的数据进行相应处理，并通过回调函数 onData 通知前端。
+   *
    * @param {string} eventType - 事件类型
    * @param {Object} data - 数据
    * @param {Function} onData - 数据回调函数
@@ -483,13 +510,27 @@ class ApiClient {
 
       const data = await response.json();
       console.log("对话消息获取成功:", data);
+      function extractPureText(rawContent) {
+        try {
+          const data = JSON.parse(rawContent); // 把 JSON 字符串转成对象
+          if (Array.isArray(data)) {
+            return data
+              .filter((item) => item.type === "text") // 只要文本类型
+              .map((item) => item.text) // 取出文本内容
+              .join("\n"); // 多段文本用换行拼接
+          }
+        } catch (e) {
+          // 解析失败说明它本来就是普通字符串，直接返回
+        }
+        return rawContent;
+      }
 
       // 转换消息格式以适配前端
       const messages =
         data.data?.map((msg) => ({
           id: msg.id,
           role: msg.role,
-          content: msg.content,
+          content: extractPureText(msg.content),
           contentType: msg.content_type,
           timestamp: new Date(msg.created_at * 1000).toISOString(),
           conversationId: msg.conversation_id,
@@ -513,108 +554,126 @@ class ApiClient {
     }
   }
 
-  /**
-   * 上传文件
-   * @param {File} file - 文件内容
-   * @param {string} fileName - 文件名
-   * @param {string} mimeType - 文件MIME类型（可选，会自动推断）
-   * @returns {Promise<string>} 文件ID
-   */
-  async uploadFile(file, fileName, mimeType = null) {
+  async uploadFile(file) {
+    const client = new CozeAPI({
+      token: this.apiKey,
+      baseURL: "https://api.coze.cn/",
+      allowPersonalAccessTokenInBrowser: true,
+    });
     try {
-      const uploadUrl = `https://api.coze.cn/v1/files/upload`;
-
-      // 如果没有提供MIME类型，尝试从文件名推断
-      const finalMimeType = mimeType || this.inferMimeType(fileName);
-
-      // 验证 MIME 类型是否支持
-      const supportedTypes = [
-        "application/pdf",
-        "image/jpeg",
-        "image/jpg",
-        "image/png",
-        "text/plain",
-      ];
-
-      if (!supportedTypes.includes(finalMimeType)) {
-        throw new Error(
-          `不支持的文件类型：${finalMimeType}。支持的格式：${supportedTypes.join(", ")}`
-        );
-      }
-
-      console.log("开始上传文件到 Coze:", {
-        fileName,
-        mimeType: finalMimeType,
-        fileSize: file.size,
-      });
-
-      // 发送请求 - 使用指定的请求头格式
-      const response = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${this.apiKey}`,
-          "Content-Type": `multipart/form-data`,
-        },
-        body: file,
-      });
-
-      if (!response.ok) {
-        throw await this.handleError(response);
-      }
-
-      const data = await response.json();
-
-      // 根据官方文档，检查响应的code字段
-      if (data.code !== 0) {
-        const errorMsg = data.msg || data.message || "文件上传失败";
-        throw new Error(`Coze API 错误 (code: ${data.code}): ${errorMsg}`);
-      }
-
-      console.log("文件上传成功:", {
-        file_id: data.data?.id,
-        filename: data.data?.file_name || fileName,
-        bytes: data.data?.bytes,
-        created_at: data.data?.created_at,
-      });
-
-      if (!data.data?.id) {
-        throw new Error("文件上传失败：响应中未返回文件ID");
-      }
-
-      return data.data.id;
-    } catch (error) {
-      console.error("文件上传失败:", {
-        fileName,
-        fileSize: fileBuffer.length,
-        error: error.message,
-        stack: error.stack,
-      });
-
-      // 提供更友好的错误信息
-      if (
-        error.message.includes("413") ||
-        error.message.includes("Payload Too Large")
-      ) {
-        throw new Error(
-          `文件太大，无法上传。最大支持 20MB，当前文件: ${Math.round((fileBuffer.length / 1024 / 1024) * 100) / 100}MB`
-        );
-      } else if (
-        error.message.includes("401") ||
-        error.message.includes("认证失败")
-      ) {
-        throw new Error("API 密钥无效，请检查 Coze API 配置");
-      } else if (
-        error.message.includes("415") ||
-        error.message.includes("Unsupported Media Type")
-      ) {
-        throw new Error(
-          `不支持的文件类型。支持的格式: PDF、图片（JPG、PNG、GIF、BMP、WEBP）、TXT`
-        );
-      }
-
-      throw error;
+      const res = await client.files.upload({ file });
+      console.log(res);
+      return res.id;
+    } catch (e) {
+      console.error(e);
     }
   }
+
+  // /**
+  //  * 上传文件
+  //  * @param {File} file - 文件内容
+  //  * @param {string} fileName - 文件名
+  //  * @param {string} mimeType - 文件MIME类型（可选，会自动推断）
+  //  * @returns {Promise<string>} 文件ID
+  //  */
+  // async uploadFile(file, fileName, mimeType = null) {
+  //   try {
+  //     const uploadUrl = `https://api.coze.cn/v1/files/upload`;
+
+  //     // 如果没有提供MIME类型，尝试从文件名推断
+  //     const finalMimeType = mimeType || this.inferMimeType(fileName);
+
+  //     // 验证 MIME 类型是否支持
+  //     const supportedTypes = [
+  //       "application/pdf",
+  //       "image/jpeg",
+  //       "image/jpg",
+  //       "image/png",
+  //       "text/plain",
+  //     ];
+
+  //     if (!supportedTypes.includes(finalMimeType)) {
+  //       throw new Error(
+  //         `不支持的文件类型：${finalMimeType}。支持的格式：${supportedTypes.join(", ")}`
+  //       );
+  //     }
+
+  //     console.log("开始上传文件到 Coze:", {
+  //       fileName,
+  //       mimeType: finalMimeType,
+  //       fileSize: file.size,
+  //     });
+
+  //     const formData = new FormData();
+  //     formData.append("file", file, "resume.pdf");
+
+  //     // 发送请求 - 使用指定的请求头格式
+  //     const response = await fetch(uploadUrl, {
+  //       method: "POST",
+  //       headers: {
+  //         "Authorization": `Bearer ${this.apiKey}`,
+  //         "Content-Type": `multipart/form-data`,
+  //       },
+  //       body: formData,
+  //     });
+
+  //     if (!response.ok) {
+  //       throw await this.handleError(response);
+  //     }
+
+  //     const data = await response.json();
+
+  //     // 根据官方文档，检查响应的code字段
+  //     if (data.code !== 0) {
+  //       const errorMsg = data.msg || data.message || "文件上传失败";
+  //       throw new Error(`Coze API 错误 (code: ${data.code}): ${errorMsg}`);
+  //     }
+
+  //     console.log("文件上传成功:", {
+  //       file_id: data.data?.id,
+  //       filename: data.data?.file_name || fileName,
+  //       bytes: data.data?.bytes,
+  //       created_at: data.data?.created_at,
+  //     });
+
+  //     if (!data.data?.id) {
+  //       throw new Error("文件上传失败：响应中未返回文件ID");
+  //     }
+
+  //     return data.data.id;
+  //   } catch (error) {
+  //     console.error("文件上传失败:", {
+  //       fileName,
+  //       fileSize: file.size,
+  //       error: error.message,
+  //       stack: error.stack,
+  //     });
+
+  //     // 提供更友好的错误信息
+  //     if (
+  //       error.message.includes("413") ||
+  //       error.message.includes("Payload Too Large")
+  //     ) {
+  //       throw new Error(
+  //         `文件太大，无法上传。最大支持 20MB，当前文件: ${Math.round((file.size / 1024 / 1024) * 100) / 100}MB`
+  //       );
+  //     } else if (
+  //       error.message.includes("401") ||
+  //       error.message.includes("认证失败")
+  //     ) {
+  //       throw new Error("API 密钥无效，请检查 Coze API 配置");
+  //     } else if (
+  //       error.message.includes("415") ||
+  //       error.message.includes("Unsupported Media Type")
+  //     ) {
+  //       throw new Error(
+  //         `不支持的文件类型。支持的格式: PDF、图片（JPG、PNG）、TXT`
+  //       );
+  //     }
+
+  //     throw error;
+  //   }
+  // }
 
   /**
    * 发送消息到对话（流式）
@@ -624,6 +683,7 @@ class ApiClient {
    * @param {Function} onData - 数据回调函数
    * @param {AbortSignal} signal - 取消信号
    * @param {File} file - 可选的文件对象
+   * @param {string} userId - 用户ID（可选）
    * @returns {Promise<Object>} 流式响应处理结果
    */
   async sendMessageToConversation(
@@ -632,27 +692,36 @@ class ApiClient {
     analysisType = "evaluate",
     onData,
     signal = null,
-    file = null
+    file = null,
+    userId = null
   ) {
     try {
       if (file) {
         // 文件上传模式
-        const formData = new FormData();
-        const fileId = await this.uploadFile(file, file.name, file.type);
-        formData.append("file_id", fileId);
-        formData.append("analysis_type", analysisType);
-        if (message) {
-          formData.append("question", message);
-        }
+        const fileId = await this.uploadFile(file);
+        const requestBody = {
+          file_id: fileId,
+          analysis_type: analysisType,
+          question: message,
+        };
+
         if (conversationId) {
-          formData.append("conversation_id", conversationId);
+          requestBody.conversation_id = conversationId;
         }
 
-        const response = await this.request(`/api/analyze`, {
-          method: "POST",
-          body: formData,
-          signal,
-        });
+        if (userId) {
+          requestBody.user_id = userId;
+        }
+
+        const response = await this.request(
+          `/api/analyze`,
+          {
+            method: "POST",
+            body: JSON.stringify(requestBody),
+            signal,
+          },
+          userId
+        );
 
         if (!response.ok) {
           throw await this.handleError(response);
@@ -671,11 +740,19 @@ class ApiClient {
           requestBody.conversation_id = conversationId;
         }
 
-        const response = await this.request("/api/analyze", {
-          method: "POST",
-          body: JSON.stringify(requestBody),
-          signal,
-        });
+        if (userId) {
+          requestBody.user_id = userId;
+        }
+
+        const response = await this.request(
+          "/api/analyze",
+          {
+            method: "POST",
+            body: JSON.stringify(requestBody),
+            signal,
+          },
+          userId
+        );
 
         return await this.handleStreamResponse(response, onData, signal);
       }
