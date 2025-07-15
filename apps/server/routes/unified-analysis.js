@@ -108,10 +108,18 @@ class RouteManager {
       }
     });
 
+    // 获取对话详情
+    router.get("/conversations/retrieve", async (req, res) => {
+      const { conversation_id } = req.query;
+      const conversation =
+        await this.analysisService.getConversationDetail(conversation_id);
+      res.json(conversation);
+    });
+
     // 获取用户对话列表
     router.post("/conversations", async (req, res) => {
       try {
-        const { user_id, limit = 20, order = "desc" } = req.body;
+        const { user_id, order = "desc", session_name } = req.body;
 
         if (!user_id) {
           return res.status(400).json({
@@ -120,15 +128,15 @@ class RouteManager {
           });
         }
 
-        console.log("获取用户对话列表:", { user_id, limit, order });
+        console.log("获取用户对话列表:", { user_id, order, session_name });
 
-        // 调用Coze API获取对话列表
+        // 调用Coze API获取对话列表，使用会话隔离
         const conversations = await this.analysisService.getUserConversations(
           user_id,
           {
-            limit,
             order,
-          }
+          },
+          session_name
         );
 
         res.json({
@@ -149,7 +157,14 @@ class RouteManager {
     router.post("/conversations/:conversationId/messages", async (req, res) => {
       try {
         const { conversationId } = req.params;
-        const { limit, order = "asc", chat_id, before_id } = req.body;
+        const {
+          limit,
+          order = "asc",
+          chat_id,
+          before_id,
+          user_id,
+          session_name,
+        } = req.body;
 
         if (!conversationId) {
           return res.status(400).json({
@@ -164,9 +179,11 @@ class RouteManager {
           order,
           chat_id,
           before_id,
+          user_id,
+          session_name,
         });
 
-        // 调用Coze API获取消息列表
+        // 调用Coze API获取消息列表，使用会话隔离
         const messages = await this.analysisService.getConversationMessages(
           conversationId,
           {
@@ -174,7 +191,9 @@ class RouteManager {
             order,
             chat_id,
             before_id,
-          }
+          },
+          user_id,
+          session_name
         );
 
         res.json({

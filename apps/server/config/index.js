@@ -1,6 +1,5 @@
 import dotenv from "dotenv";
 
-
 // 加载环境变量
 dotenv.config();
 
@@ -27,6 +26,13 @@ class ConfigManager {
     if (missingVars.length > 0) {
       const missingNames = missingVars.map(({ name }) => name).join(", ");
       throw new Error(`缺少必要的环境变量: ${missingNames}`);
+    }
+
+    // 验证JWT相关的环境变量（可选，但建议设置）
+    if (!process.env.JWT_SECRET) {
+      console.warn(
+        "警告: 未设置JWT_SECRET环境变量，将使用默认值。建议在生产环境中设置强密码。"
+      );
     }
   }
 
@@ -85,16 +91,12 @@ class ConfigManager {
         // 文本格式
         "text/plain",
       ],
-      SUPPORTED_EXTENSIONS: [
-        ".pdf", 
-        ".jpg", ".jpeg", ".png",
-        ".txt"
-      ],
+      SUPPORTED_EXTENSIONS: [".pdf", ".jpg", ".jpeg", ".png", ".txt"],
       // MIME类型映射 - 用于根据扩展名推断MIME类型
       MIME_TYPE_MAP: {
         ".pdf": "application/pdf",
         ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg", 
+        ".jpeg": "image/jpeg",
         ".png": "image/png",
         ".txt": "text/plain",
       },
@@ -126,6 +128,28 @@ class ConfigManager {
   }
 
   /**
+   * 获取JWT配置
+   * @returns {Object} JWT配置对象
+   */
+  get jwt() {
+    return {
+      SECRET:
+        process.env.JWT_SECRET ||
+        "your-jwt-secret-key-for-coze-session-isolation",
+      ISSUER: process.env.JWT_ISSUER || "resume-analysis-app",
+      AUDIENCE: process.env.JWT_AUDIENCE || "coze-api",
+      EXPIRY: process.env.JWT_EXPIRY || "1h",
+      ALGORITHM: "HS256",
+      // 扣子会话隔离相关配置
+      SESSION_ISOLATION: {
+        ENABLED: true,
+        CHANNEL: process.env.COZE_CHANNEL || "default",
+        PREFIX: "user_",
+      },
+    };
+  }
+
+  /**
    * 获取所有配置
    * @returns {Object} 完整配置对象
    */
@@ -133,6 +157,7 @@ class ConfigManager {
     return {
       server: this.server,
       coze: this.coze,
+      jwt: this.jwt,
       fileLimits: this.fileLimits,
       analysisTypes: this.analysisTypes,
       analysisTypeDescriptions: this.analysisTypeDescriptions,
@@ -180,6 +205,15 @@ class ConfigManager {
         hasBotId: !!this.coze.BOT_ID,
         baseUrl: this.coze.BASE_URL,
         maxTextLength: this.coze.MAX_TEXT_LENGTH,
+      },
+      jwt: {
+        hasSecret: !!process.env.JWT_SECRET,
+        issuer: this.jwt.ISSUER,
+        audience: this.jwt.AUDIENCE,
+        expiry: this.jwt.EXPIRY,
+        algorithm: this.jwt.ALGORITHM,
+        sessionIsolationEnabled: this.jwt.SESSION_ISOLATION.ENABLED,
+        channel: this.jwt.SESSION_ISOLATION.CHANNEL,
       },
       fileLimits: {
         maxFileSize: this.fileLimits.MAX_FILE_SIZE,

@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import apiClient from "../services/apiService";
+import { apiClient } from "../services/apiService";
 
 const useAnalysis = () => {
   const [selectedFile, setSelectedFile] = useState(null);

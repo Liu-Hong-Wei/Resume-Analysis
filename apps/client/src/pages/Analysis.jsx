@@ -129,10 +129,7 @@ function Analysis() {
               </div>
             ) : (
               <ChatList
-                conversations={conversationIds.map((id) => ({
-                  id,
-                  title: `对话 ${id.slice(-6)}`,
-                }))}
+                conversationIds={conversationIds}
                 currentConversationId={currentConversationId}
                 onSwitchConversation={handleSwitchConversation}
                 onDeleteConversation={handleDeleteConversation}

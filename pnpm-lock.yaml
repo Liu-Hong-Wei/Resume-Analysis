@@ -93,6 +93,9 @@ importers:
       form-data:
         specifier: ^4.0.3
         version: 4.0.3
+      jsonwebtoken:
+        specifier: ^9.0.2
+        version: 9.0.2
       mammoth:
         specifier: ^1.6.0
         version: 1.9.1

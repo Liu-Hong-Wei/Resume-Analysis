@@ -1,5 +1,6 @@
 import { COZE_CONFIG } from "../config/index.js";
 import FormData from "form-data";
+import { jwtAuthService } from "./jwtAuthService.js";
 
 /**
  * Coze API 客户端类
@@ -15,27 +16,59 @@ class CozeClient {
   /**
    * 创建 HTTP 请求头
    * @param {Object} additionalHeaders - 额外的请求头
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Object} 请求头对象
    */
-  createHeaders(additionalHeaders = {}) {
-    return {
+  createHeaders(additionalHeaders = {}, userId = null, sessionName = null) {
+    const baseHeaders = {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${this.apiKey}`,
       "User-Agent": "Resume-Analysis-API/1.0",
-      ...additionalHeaders,
     };
+
+    // 如果提供了userId，使用OAuth JWT认证
+    if (userId) {
+      try {
+        const jwtHeaders = jwtAuthService.generateCozeAuthHeaders(
+          userId,
+          sessionName
+        );
+        return {
+          ...baseHeaders,
+          ...jwtHeaders,
+          ...additionalHeaders,
+        };
+      } catch (error) {
+        console.error("OAuth JWT认证失败，回退到API Key认证:", error);
+        // 回退到原有的API Key认证方式
+        return {
+          ...baseHeaders,
+          Authorization: `Bearer ${this.apiKey}`,
+          ...additionalHeaders,
+        };
+      }
+    } else {
+      // 使用原有的API Key认证方式
+      return {
+        ...baseHeaders,
+        Authorization: `Bearer ${this.apiKey}`,
+        ...additionalHeaders,
+      };
+    }
   }
 
   /**
    * 发送 HTTP 请求
    * @param {string} url - 请求URL
    * @param {Object} options - 请求选项
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<Response>} 响应对象
    */
-  async request(url, options = {}) {
+  async request(url, options = {}, userId = null, sessionName = null) {
     const response = await fetch(url, {
       ...options,
-      headers: this.createHeaders(options.headers),
+      headers: this.createHeaders(options.headers, userId, sessionName),
     });
     if (!response.ok) {
       throw await this.handleError(response);
@@ -103,18 +136,25 @@ class CozeClient {
 
   /**
    * 创建对话
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<string>} 对话ID
    */
-  async createConversation() {
+  async createConversation(userId = null, sessionName = null) {
     try {
-      console.log("创建 Coze 对话...");
+      console.log("创建 Coze 对话...", { userId, sessionName });
 
-      const response = await this.request(this.config.API_URL, {
-        method: "POST",
-        body: JSON.stringify({
-          bot_id: this.botId,
-        }),
-      });
+      const response = await this.request(
+        this.config.API_URL,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            bot_id: this.botId,
+          }),
+        },
+        userId,
+        sessionName
+      );
 
       const data = await response.json();
       console.log("对话创建成功:", data);
@@ -224,18 +264,29 @@ class CozeClient {
    * @param {string} conversationId - 对话ID
    * @param {Object} message - 消息对象
    * @param {Object} options - 请求选项
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<Object>} 响应数据
    */
-  async sendChatRequest(conversationId, message, options = {}) {
+  async sendChatRequest(
+    conversationId,
+    message,
+    options = {},
+    userId = null,
+    sessionName = null
+  ) {
     const {
       stream = true,
       customVariables = {},
       autoSaveHistory = true,
     } = options;
 
+    // 使用userId作为user_id，实现用户隔离
+    const finalUserId = userId || "resume_analysis_user";
+
     const requestBody = {
       bot_id: this.botId,
-      user_id: "resume_analysis_user",
+      user_id: finalUserId,
       stream,
       auto_save_history: autoSaveHistory,
       additional_messages: [message],
@@ -246,11 +297,21 @@ class CozeClient {
       requestBody.custom_variables = customVariables;
     }
 
+    // 如果有sessionName，添加到自定义变量中（扣子会话隔离要求）
+    if (sessionName) {
+      requestBody.custom_variables = {
+        ...requestBody.custom_variables,
+        session_name: sessionName,
+      };
+    }
+
     console.log("发送 Coze API 请求:", {
       conversation_id: conversationId,
+      user_id: finalUserId,
+      session_name: sessionName,
       stream,
       message_type: message.content_type,
-      custom_variables: customVariables,
+      custom_variables: requestBody.custom_variables,
     });
 
     console.log(
@@ -267,7 +328,9 @@ class CozeClient {
           Accept: stream ? "text/event-stream" : "application/json",
         },
         body: JSON.stringify(requestBody),
-      }
+      },
+      userId,
+      sessionName
     );
     console.log("response 状态:", response.status);
     console.log("response 状态文本:", response.statusText);
@@ -280,26 +343,52 @@ class CozeClient {
   }
 
   /**
+   * 获取对话详情
+   * @param {string} conversationId - 对话ID
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
+   * @returns {Promise<Object>} 对话详情
+   */
+  async getConversationDetail(
+    conversationId,
+    userId = null,
+    sessionName = null
+  ) {
+    const response = await this.request(
+      `${this.baseURL}/v1/conversations/retrieve?conversation_id=${conversationId}`,
+      { method: "GET" },
+      userId,
+      sessionName
+    );
+    const data = await response.json();
+    return data.data;
+  }
+
+  /**
    * 获取用户对话列表
    * @param {string} userId - 用户ID
    * @param {Object} options - 查询选项
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<Array>} 对话列表
    */
-  async getUserConversations(userId, options = {}) {
+  async getUserConversations(userId, options = {}, sessionName = null) {
     try {
-      console.log("获取用户对话列表:", { userId, options });
+      console.log("获取用户对话列表:", { userId, options, sessionName });
 
-      const requestBody = {
-        limit: options.limit || 20,
-        order: options.order || "desc",
-        user_id: userId,
-      };
-
-      // TODO: 检验用户是否存在
-      const response = await this.request(`${this.baseURL}/v1/conversations`, {
-        method: "POST",
-        body: JSON.stringify(requestBody),
+      const queryParams = new URLSearchParams({
+        bot_id: this.botId,
+        page_num: 1,
+        order: options.order?.toUpperCase() || "DESC",
       });
+
+      const response = await this.request(
+        `${this.baseURL}/v1/conversations?${queryParams.toString()}`,
+        {
+          method: "GET",
+        },
+        userId,
+        sessionName
+      );
 
       const data = await response.json();
       console.log("用户对话列表获取成功:", data);
@@ -315,11 +404,23 @@ class CozeClient {
    * 获取对话消息列表
    * @param {string} conversationId - 对话ID
    * @param {Object} options - 查询选项
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<Object>} 消息列表和分页信息
    */
-  async getConversationMessages(conversationId, options = {}) {
+  async getConversationMessages(
+    conversationId,
+    options = {},
+    userId = null,
+    sessionName = null
+  ) {
     try {
-      console.log("获取对话消息:", { conversationId, options });
+      console.log("获取对话消息:", {
+        conversationId,
+        options,
+        userId,
+        sessionName,
+      });
 
       const requestBody = {
         limit: options.limit || null,
@@ -333,7 +434,9 @@ class CozeClient {
         {
           method: "POST",
           body: JSON.stringify(requestBody),
-        }
+        },
+        userId,
+        sessionName
       );
 
       const data = await response.json();
@@ -616,17 +719,25 @@ class CozeClient {
    * @param {string} text - 文本内容
    * @param {Response} res - Express响应对象
    * @param {Object} customVariables - 自定义变量
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<void>}
    */
-  async analyzeTextStream(text, res, customVariables = {}) {
+  async analyzeTextStream(
+    text,
+    res,
+    customVariables = {},
+    userId = null,
+    sessionName = null
+  ) {
     try {
       console.log("analyzeTextStream 开始执行");
-      console.log("参数:", { text, customVariables });
+      console.log("参数:", { text, customVariables, userId, sessionName });
 
       // 如果提供了conversation_id，使用它；否则创建新的对话
       let conversationId = customVariables.conversation_id;
       if (!conversationId) {
-        conversationId = await this.createConversation();
+        conversationId = await this.createConversation(userId, sessionName);
         console.log("对话ID创建完成:", conversationId);
 
         // 发送对话创建事件到前端
@@ -644,10 +755,16 @@ class CozeClient {
       console.log("消息构建完成:", message);
 
       console.log("发送聊天请求");
-      const response = await this.sendChatRequest(conversationId, message, {
-        stream: true,
-        customVariables,
-      });
+      const response = await this.sendChatRequest(
+        conversationId,
+        message,
+        {
+          stream: true,
+          customVariables,
+        },
+        userId,
+        sessionName
+      );
 
       console.log("开始处理流式响应");
       await this.handleStreamResponse(response, (data) => {
@@ -742,7 +859,6 @@ class CozeClient {
       );
       console.log("检测到文件类型:", fileType);
 
-
       const message = this.buildFileMessage(fileId, text, fileType);
       console.log("消息构建完成:", message);
 
@@ -775,22 +891,32 @@ class CozeClient {
    * @param {Response} res - Express响应对象
    * @param {string} text - 文本内容（可选）
    * @param {Object} customVariables - 自定义变量
+   * @param {string} userId - 用户ID（用于OAuth JWT认证）
+   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<void>}
    */
   async analyzeFileWithIdStream(
     fileId,
     res,
     text = null,
-    customVariables = {}
+    customVariables = {},
+    userId = null,
+    sessionName = null
   ) {
     try {
       console.log("analyzeFileWithIdStream 开始执行");
-      console.log("参数:", { fileId, text, customVariables });
+      console.log("参数:", {
+        fileId,
+        text,
+        customVariables,
+        userId,
+        sessionName,
+      });
 
       // 如果提供了conversation_id，使用它；否则创建新的对话
       let conversationId = customVariables.conversation_id;
       if (!conversationId) {
-        conversationId = await this.createConversation();
+        conversationId = await this.createConversation(userId, sessionName);
         console.log("对话ID创建完成:", conversationId);
 
         // 发送对话创建事件到前端
@@ -808,10 +934,16 @@ class CozeClient {
       const message = this.buildFileMessage(fileId, text, "document");
       console.log("消息构建完成:", message);
 
-      const response = await this.sendChatRequest(conversationId, message, {
-        stream: true,
-        customVariables,
-      });
+      const response = await this.sendChatRequest(
+        conversationId,
+        message,
+        {
+          stream: true,
+          customVariables,
+        },
+        userId,
+        sessionName
+      );
 
       console.log("开始处理流式响应");
       await this.handleStreamResponse(response, (data) => {
@@ -860,9 +992,17 @@ export async function analyzeResumeWithCozeFile(
 export async function analyzeResumeWithCozeStream(
   userQuestion,
   res,
-  customVariables = {}
+  customVariables = {},
+  userId = null,
+  sessionName = null
 ) {
-  return cozeClient.analyzeTextStream(userQuestion, res, customVariables);
+  return cozeClient.analyzeTextStream(
+    userQuestion,
+    res,
+    customVariables,
+    userId,
+    sessionName
+  );
 }
 
 export async function analyzeResumeWithCozeFileStream(

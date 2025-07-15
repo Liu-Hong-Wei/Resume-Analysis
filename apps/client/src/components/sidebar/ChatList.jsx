@@ -1,11 +1,11 @@
-import React, { useState } from "react";
+import React from "react";
 
 /**
  * 对话列表组件
  * 显示用户的所有对话，支持切换、删除、归档等操作
  */
 const ChatList = ({
-  conversations = [],
+  conversationIds = [],
   currentConversationId,
   onSwitchConversation,
   onDeleteConversation,
@@ -39,78 +39,83 @@ const ChatList = ({
 
   // 获取对话预览
   const getConversationPreview = (conversation) => {
-    // 简化版本，直接返回标题
     return conversation.title || "新对话";
   };
 
   // 获取对话类型图标
   const getTypeIcon = (type) => {
     switch (type) {
-      case "resume_analysis":
+      case "analysis":
         return "📄";
-      case "general_chat":
-        return "💬";
-      case "interview":
+      case "generate":
+        return "🖊️";
+      case "mock":
         return "🎯";
       default:
         return "💬";
     }
   };
 
+  const getConversationDetail = async (conversationId) => {
+    const conversation = await apiClient.getConversationDetail(conversationId);
+    return conversation;
+  };
+
+
   return (
     <div>
       {/* 对话列表 */}
-      <div className="space-y-2 max-h-[400px] overflow-y-auto">
-        {conversations.length === 0 ? (
+      <div className="space-y-2 max-h-[20vh] overflow-y-auto">
+        {conversationIds.length === 0 ? (
           <div className="text-center text-gray-500 py-8">暂无对话</div>
         ) : (
-          conversations.map((conversation) => (
+          conversationIds.map((conversationId) => (
             <div
-              key={conversation.id}
+              key={conversationId}
               className={`card card-compact cursor-pointer transition-all duration-200 ${
-                currentConversationId === conversation.id
+                currentConversationId === conversationId
                   ? "bg-primary text-primary-content shadow-lg"
                   : "bg-base-100 hover:bg-base-200"
               }`}
-              onClick={() => onSwitchConversation(conversation.id)}
+              onClick={() => onSwitchConversation(conversationId)}
             >
               <div className="card-body p-3">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">
-                        {getTypeIcon(conversation.type || "general_chat")}
-                      </span>
+                      {/* <span className="text-lg">
+                        {getTypeIcon(getConversationDetail(conversationId).type || "general_chat")}
+                      </span> */}
                       <h3
                         className={`font-medium truncate ${
-                          currentConversationId === conversation.id
+                          currentConversationId === conversationId
                             ? "text-primary-content"
                             : ""
                         }`}
                       >
-                        {conversation.title || "新对话"}
+                        {/* {conversation.title || "新对话"} */}
                       </h3>
                     </div>
 
                     <p
                       className={`text-sm truncate ${
-                        currentConversationId === conversation.id
+                        currentConversationId === conversationId
                           ? "text-primary-content/80"
                           : "text-gray-600"
                       }`}
                     >
-                      {getConversationPreview(conversation)}
+                      {/* {getConversationPreview(conversation)} */}
                     </p>
-
+{/* 
                     <div className="flex items-center justify-between mt-2">
                       <span
                         className={`text-xs ${
-                          currentConversationId === conversation.id
+                          currentConversationId === conversationId
                             ? "text-primary-content/60"
                             : "text-gray-400"
                         }`}
                       >
-                        {formatTime(conversation.updatedAt)}
+                        {formatTime(conversation.createdAt)}
                       </span>
 
                       {conversation.metadata?.analysisType && (
@@ -118,7 +123,7 @@ const ChatList = ({
                           {conversation.metadata.analysisType}
                         </span>
                       )}
-                    </div>
+                    </div> */}
                   </div>
 
                   {/* 操作按钮 */}
@@ -139,7 +144,7 @@ const ChatList = ({
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            onDeleteConversation(conversation.id);
+                            onDeleteConversation(conversationId);
                           }}
                           className="text-sm text-error"
                         >

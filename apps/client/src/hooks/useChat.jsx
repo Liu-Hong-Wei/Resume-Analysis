@@ -27,8 +27,7 @@ const useChat = (userId) => {
       setError(null);
       console.log("获取用户对话列表:", userId);
 
-      const conversations = await apiClient.getUserConversations(userId, {
-        limit: 20,
+      const conversations = await apiClient.getUserConversationIds(userId, {
         order: "desc",
       });
 
