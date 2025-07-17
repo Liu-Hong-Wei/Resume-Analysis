@@ -1,6 +1,6 @@
 import { COZE_CONFIG } from "../config/index.js";
 import FormData from "form-data";
-import { jwtAuthService } from "./jwtAuthService.js";
+// import { jwtAuthService } from "./jwtAuthService.js";
 
 /**
  * Coze API 客户端类

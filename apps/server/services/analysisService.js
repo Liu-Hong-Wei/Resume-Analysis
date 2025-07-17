@@ -1,6 +1,6 @@
 import { cozeClient } from "./cozeService.js";
 import { configManager } from "../config/index.js";
-import { jwtAuthService } from "./jwtAuthService.js";
+// import { jwtAuthService } from "./jwtAuthService.js";
 
 /**
  * 分析服务类
@@ -65,10 +65,10 @@ class AnalysisService {
       // 创建用户上下文（用于会话隔离）
       let userContext = null;
       if (userId) {
-        userContext = jwtAuthService.createUserContext(
-          userId,
-          additionalVars.conversation_id
-        );
+        // userContext = jwtAuthService.createUserContext(
+        //   userId,
+        //   additionalVars.conversation_id
+        // );
         sessionName = sessionName || userContext.sessionName;
       }
 
@@ -144,10 +144,10 @@ class AnalysisService {
       // 创建用户上下文（用于会话隔离）
       let userContext = null;
       if (userId) {
-        userContext = jwtAuthService.createUserContext(
-          userId,
-          additionalVars.conversation_id
-        );
+        // userContext = jwtAuthService.createUserContext(
+        //   userId,
+        //   additionalVars.conversation_id
+        // );
         sessionName = sessionName || userContext.sessionName;
       }
 

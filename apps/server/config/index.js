@@ -27,13 +27,6 @@ class ConfigManager {
       const missingNames = missingVars.map(({ name }) => name).join(", ");
       throw new Error(`缺少必要的环境变量: ${missingNames}`);
     }
-
-    // 验证JWT相关的环境变量（可选，但建议设置）
-    if (!process.env.JWT_SECRET) {
-      console.warn(
-        "警告: 未设置JWT_SECRET环境变量，将使用默认值。建议在生产环境中设置强密码。"
-      );
-    }
   }
 
   /**
