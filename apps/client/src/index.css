@@ -1,11 +1,24 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+/* 导入Google Fonts中文字体 */
+@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@100;300;400;500;700;900&family=Noto+Serif+SC:wght@200;300;400;500;600;700;900&family=Inter:wght@100;200;300;400;500;600;700;800;900&display=swap");
+
 /* 自定义CSS变量 */
 :root {
   --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
   --accent-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+
+  /* 字体变量 */
+  --font-sans:
+    "Noto Sans SC", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Roboto", "Oxygen", "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans",
+    "Helvetica Neue", sans-serif;
+  --font-serif: "Noto Serif SC", "Georgia", "Times New Roman", serif;
+  --font-mono:
+    "SF Mono", "Monaco", "Inconsolata", "Roboto Mono", "Source Code Pro",
+    monospace;
 }
 
 /* 全局样式重置 */
@@ -14,22 +27,12 @@
 }
 
 body {
-  font-family:
-    "Inter",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    "Roboto",
-    "Oxygen",
-    "Ubuntu",
-    "Cantarell",
-    "Fira Sans",
-    "Droid Sans",
-    "Helvetica Neue",
-    sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   line-height: 1.6;
+  font-weight: 400;
+  color: #333;
 }
 
 /* 导航栏专用样式 */
@@ -348,5 +351,59 @@ body {
   .navbar-glass.dark {
     background: rgba(0, 0, 0, 0.95);
     border: 2px solid currentColor;
+  }
+}
+
+/* 中文字体优化 */
+/* 字体渲染优化 */
+* {
+  text-rendering: optimizeLegibility;
+  -webkit-font-feature-settings: "kern" 1;
+  font-feature-settings: "kern" 1;
+}
+
+/* 中文字符间距优化 */
+body {
+  letter-spacing: 0.01em;
+  word-spacing: 0.05em;
+}
+
+/* 标题中文字体优化 */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  letter-spacing: -0.02em;
+  word-spacing: 0.02em;
+}
+
+
+/* 深色模式下的中文字体优化 */
+@media (prefers-color-scheme: dark) {
+  body {
+    color: #e5e7eb;
+  }
+
+  /* 深色模式下的字体渲染优化 */
+  * {
+    text-rendering: optimizeLegibility;
+  }
+}
+
+/* 高对比度模式下的中文字体优化 */
+@media (prefers-contrast: high) {
+  body {
+    font-weight: 500;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 700;
   }
 }

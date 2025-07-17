@@ -12,16 +12,14 @@ if (!PUBLISHABLE_KEY) {
 }
 
 createRoot(document.getElementById("root")).render(
-  <StrictMode>
-    <ClerkProvider
-      publishableKey={PUBLISHABLE_KEY}
-      afterSignOutUrl="/login"
-      signInFallbackRedirectUrl="/analysis"
-      signUpFallbackRedirectUrl="/analysis"
-      signInForceRedirectUrl="/analysis"
-      signUpForceRedirectUrl="/analysis"
-    >
-      <App />
-    </ClerkProvider>
-  </StrictMode>
+  <ClerkProvider
+    publishableKey={PUBLISHABLE_KEY}
+    afterSignOutUrl="/login"
+    signInFallbackRedirectUrl="/analysis"
+    signUpFallbackRedirectUrl="/analysis"
+    signInForceRedirectUrl="/analysis"
+    signUpForceRedirectUrl="/analysis"
+  >
+    <App />
+  </ClerkProvider>
 );

@@ -65,6 +65,8 @@ const MessageBox = ({ message, isOwn, timestamp, isStreaming = false }) => {
     hour: "2-digit",
     minute: "2-digit",
   });
+  // 如果内容以“现在使用 xxx 模式, ”开头，则去掉这部分
+  message.content = message.content.replace(/^现在使用.*?模式, /, "");
 
   // 处理流式输出的内容
   const { content: processedContent, shouldShowCursor } = useMemo(() => {

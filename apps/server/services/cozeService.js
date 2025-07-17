@@ -445,14 +445,14 @@ class CozeClient {
         for (const line of lines) {
           if (!line.trim()) continue;
 
-          console.log("--------------------------------");
-          console.log("处理Coze API行:", line);
-          console.log("--------------------------------");
+          // console.log("--------------------------------");
+          // console.log("处理Coze API行:", line);
+          // console.log("--------------------------------");
 
           if (line.startsWith("event:")) {
             // 保存事件类型
             currentEvent = line.slice(6).trim();
-            console.log("当前事件类型:", currentEvent);
+            // console.log("当前事件类型:", currentEvent);
           } else if (line.startsWith("data:")) {
             // 处理数据
             const data = line.slice(5).trim();
@@ -465,10 +465,10 @@ class CozeClient {
 
             try {
               const parsed = JSON.parse(data);
-              console.log("解析Coze API数据:", {
-                event: currentEvent,
-                data: parsed,
-              });
+              // console.log("解析Coze API数据:", {
+              //   event: currentEvent,
+              //   data: parsed,
+              // });
 
               // 根据Coze API事件类型处理
               if (currentEvent) {
@@ -499,7 +499,7 @@ class CozeClient {
    * @param {Function} onData - 数据回调函数
    */
   processCozeEvent(eventType, data, onData) {
-    console.log("处理Coze事件:", { eventType, data });
+    console.log("处理Coze事件:", { eventType });
 
     switch (eventType) {
       case "conversation.chat.created":
@@ -525,11 +525,7 @@ class CozeClient {
 
       case "conversation.message.delta":
         // 消息增量事件
-        if (
-          data.role === "assistant" &&
-          data.type === "answer" &&
-          data.content
-        ) {
+        if (data.content) {
           console.log("处理消息增量事件:", data.content);
           onData({
             type: "content",
@@ -741,7 +737,6 @@ class CozeClient {
         customVariables.mimeType || ""
       );
       console.log("检测到文件类型:", fileType);
-
 
       const message = this.buildFileMessage(fileId, text, fileType);
       console.log("消息构建完成:", message);

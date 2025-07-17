@@ -10,40 +10,12 @@ class AnalysisService {
     this.cozeClient = cozeClient;
   }
 
-  /**
-   * 验证分析类型
-   * @param {string} analysisType - 分析类型
-   * @throws {Error} 如果分析类型无效
-   */
-  validateAnalysisType(analysisType) {
-    const validTypes = Object.values(this.config.analysisTypes);
-    if (!validTypes.includes(analysisType)) {
-      throw new Error(
-        `无效的分析类型: ${analysisType}。有效类型: ${validTypes.join(", ")}`
-      );
-    }
-  }
-
-  /**
-   * 创建自定义变量
-   * @param {string} analysisType - 分析类型
-   * @param {Object} additionalVars - 额外的自定义变量
-   * @returns {Object} 自定义变量对象
-   */
-  createCustomVariables(analysisType, additionalVars = {}) {
-    return {
-      analysis_type: analysisType,
-      timestamp: new Date().toISOString(),
-      ...additionalVars,
-    };
-  }
 
   /**
    * 处理文件分析（流式）
    * @param {string} fileId - 文件ID
    * @param {Response} res - Express响应对象
    * @param {string} question - 问题内容（可选）
-   * @param {string} analysisType - 分析类型
    * @param {Object} additionalVars - 额外的自定义变量
    * @returns {Promise<void>}
    */
@@ -51,18 +23,10 @@ class AnalysisService {
     fileId,
     res,
     question,
-    analysisType,
     additionalVars = {}
   ) {
     try {
-      this.validateAnalysisType(analysisType);
-
-      const customVariables = this.createCustomVariables(analysisType, {
-        ...additionalVars,
-      });
-
       console.log(`开始文件流式分析:`, {
-        analysisType,
         fileId,
         hasQuestion: !!question,
       });
@@ -71,14 +35,14 @@ class AnalysisService {
         fileId,
         res,
         question,
-        customVariables
+        additionalVars
       );
     } catch (error) {
-      console.error(`文件流式分析失败 (${analysisType}):`, error);
+      console.error(`文件流式分析失败:`, error);
       res.write(
         `data: ${JSON.stringify({
           type: "error",
-          error: `${this.config.analysisTypeDescriptions[analysisType]}失败: ${error.message}`,
+          error: `文件流式分析失败: ${error.message}`,
         })}\n\n`
       );
       res.write("data: [DONE]\n\n");
@@ -89,46 +53,36 @@ class AnalysisService {
    * 处理文本分析（流式）
    * @param {string} question - 问题内容
    * @param {Response} res - Express响应对象
-   * @param {string} analysisType - 分析类型
    * @param {Object} additionalVars - 额外的自定义变量
    * @returns {Promise<void>}
    */
   async handleTextAnalysisStream(
     question,
     res,
-    analysisType,
     additionalVars = {}
   ) {
     try {
       console.log("handleTextAnalysisStream 开始执行");
-      console.log("参数:", { question, analysisType, additionalVars });
+      console.log("参数:", { question, additionalVars });
 
-      this.validateAnalysisType(analysisType);
       console.log("分析类型验证通过");
 
       if (!question || typeof question !== "string") {
         throw new Error("问题内容无效");
       }
 
-      const customVariables = this.createCustomVariables(
-        analysisType,
-        additionalVars
-      );
-      console.log("自定义变量创建完成:", customVariables);
-
       console.log(`开始文本流式分析:`, {
-        analysisType,
         questionLength: question.length,
       });
 
       console.log("调用 cozeClient.analyzeTextStream");
-      await this.cozeClient.analyzeTextStream(question, res, customVariables);
+      await this.cozeClient.analyzeTextStream(question, res);
     } catch (error) {
-      console.error(`文本流式分析失败 (${analysisType}):`, error);
+      console.error(`文本流式分析失败:`, error);
       res.write(
         `data: ${JSON.stringify({
           type: "error",
-          error: `${this.config.analysisTypeDescriptions[analysisType]}失败: ${error.message}`,
+          error: `文本流式分析失败: ${error.message}`,
         })}\n\n`
       );
       res.write("data: [DONE]\n\n");
@@ -183,11 +137,9 @@ class AnalysisService {
 
   /**
    * 创建分析处理器
-   * @param {string} analysisType - 分析类型
    * @returns {Object} 分析处理器对象
    */
-  createAnalysisHandler(analysisType) {
-    this.validateAnalysisType(analysisType);
+  createAnalysisHandler() {
 
     return {
       /**
@@ -221,7 +173,6 @@ class AnalysisService {
               file_id,
               res,
               question,
-              analysisType,
               { conversation_id, user_id }
             );
           } else {
@@ -230,12 +181,11 @@ class AnalysisService {
               file_id,
               res,
               question,
-              analysisType,
               { user_id }
             );
           }
         } catch (error) {
-          console.error(`${analysisType} 文件流式分析错误:`, error);
+          console.error(`文件流式分析错误:`, error);
           // 如果还没有设置响应头，先设置
           if (!res.headersSent) {
             res.writeHead(200, {
@@ -294,18 +244,18 @@ class AnalysisService {
 
           if (conversation_id) {
             console.log("conversation_id 存在，使用现有对话");
-            await this.handleTextAnalysisStream(question, res, analysisType, {
+            await this.handleTextAnalysisStream(question, res, {
               conversation_id,
               user_id,
             });
           } else {
             console.log("conversation_id 不存在，创建新对话");
-            await this.handleTextAnalysisStream(question, res, analysisType, {
+            await this.handleTextAnalysisStream(question, res, {
               user_id,
             });
           }
         } catch (error) {
-          console.error(`${analysisType} 文本流式分析错误:`, error);
+          console.error(`文本流式分析错误:`, error);
           // 如果还没有设置响应头，先设置
           if (!res.headersSent) {
             res.writeHead(200, {

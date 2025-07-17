@@ -15,26 +15,24 @@ class RouteManager {
 
   /**
    * 创建特定分析类型的路由
-   * @param {string} analysisType - 分析类型
    * @returns {Object} 路由处理器对象
    */
-  createAnalysisRoutes(analysisType) {
-    const handler = this.analysisService.createAnalysisHandler(analysisType);
-    const typeName = this.config.analysisTypeDescriptions[analysisType];
+  createAnalysisRoutes() {
+    const handler = this.analysisService.createAnalysisHandler();
 
     return {
       // 文件分析（流式）
-      [`/${analysisType}-resume-stream`]: {
+      [`/resume-stream`]: {
         method: "POST",
         handler: handler.handleFileAnalysisStream,
-        description: `${typeName} - 文件ID模式（流式）`,
+        description: `文件ID模式（流式）`,
       },
 
       // 文本分析（流式）
-      [`/${analysisType}-resume-question-stream`]: {
+      [`/resume-question-stream`]: {
         method: "POST",
         handler: handler.handleQuestionAnalysisStream,
-        description: `${typeName} - 文本模式（流式）`,
+        description: `文本模式（流式）`,
       },
     };
   }
@@ -47,7 +45,6 @@ class RouteManager {
     router.post("/analyze", async (req, res) => {
       try {
         const {
-          analysis_type,
           conversation_id,
           user_id = "default_user",
           file_id,
@@ -55,21 +52,19 @@ class RouteManager {
         } = req.body;
         console.log("--------------------------------");
         console.log("req.body: ", req.body);
-        console.log("analysis_type: ", analysis_type);
         console.log("conversation_id: ", conversation_id);
         console.log("file_id: ", file_id);
         console.log("question: ", question);
         console.log("--------------------------------");
 
-        if (!analysis_type) {
+        if (!question) {
           return res.status(400).json({
-            error: "缺少必需参数: analysis_type",
+            error: "缺少必需参数: question",
             timestamp: new Date().toISOString(),
           });
         }
 
-        const handler =
-          this.analysisService.createAnalysisHandler(analysis_type);
+        const handler = this.analysisService.createAnalysisHandler();
 
         // 只支持流式分析
         if (file_id) {
@@ -225,7 +220,7 @@ class RouteManager {
 
     // 为每种分析类型创建专用路由
     analysisTypes.forEach((analysisType) => {
-      const routes = this.createAnalysisRoutes(analysisType);
+      const routes = this.createAnalysisRoutes();
 
       Object.entries(routes).forEach(([path, routeConfig]) => {
         const fullPath = `/analysis${path}`;

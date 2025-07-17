@@ -19,19 +19,18 @@ function NavLayout() {
 
   const navItems = [
     { path: "/", label: "首页", icon: "🏠" },
-    { path: "/analysis", label: "简历分析", icon: "💬" },
-    // { path: "/chat", label: "AI对话", icon: "💬" },
-    { path: "/about", label: "关于我们", icon: "ℹ️" },
+    { path: "/analysis", label: "简历分析", icon: "🤔" },
+    { path: "/about", label: "了解更多", icon: "👀" },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-base-200 via-base-100 to-base-200">
       {/* 导航栏 */}
       <div
-        className={`navbar fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out navbar-mobile-optimized ${
+        className={`navbar fixed top-0 left-0 right-0 z-50 transition-all duration-300 ease-in-out navbar-mobile-optimized navbar-glass ${
           isScrolled
-            ? "bg-base-100/95 backdrop-blur-md shadow-lg border-b border-base-300/20"
-            : "navbar-glass"
+            ? "bg-base-100/95 backdrop-blur-3xl shadow-lg border-b border-base-300/20 "
+            : ""
         }`}
       >
         <div className="navbar-start">
@@ -81,7 +80,7 @@ function NavLayout() {
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <span className="text-lg">{item.icon}</span>
-                    <span className="font-medium">{item.label}</span>
+                    <span className="font-medium text-xl">{item.label}</span>
                   </Link>
                 </li>
               ))}
@@ -99,7 +98,7 @@ function NavLayout() {
               </div>
             </div>
             <span className="ml-3 font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              简历分析系统
+              智简对话
             </span>
           </Link>
         </div>
@@ -137,7 +136,7 @@ function NavLayout() {
       </div>
 
       {/* 主要内容区域 */}
-      <main className="pt-20 h-screen">
+      <main className="pt-16 min-h-screen">
         <div
           className={`mx-auto h-full w-full ${
             location.pathname === "/analysis"

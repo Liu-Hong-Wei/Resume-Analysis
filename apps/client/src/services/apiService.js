@@ -15,7 +15,7 @@ class ApiClient {
   constructor() {
     this.baseURL = clientConfig.server.API_BASE_URL;
     this.apiKey = clientConfig.coze.API_KEY;
-    console.log("APIKey", this.apiKey);
+    // console.log("APIKey", this.apiKey);
   }
 
   /**
@@ -115,7 +115,6 @@ class ApiClient {
   /**
    * 聊天对话 API（流式）
    * @param {string} question - 用户问题
-   * @param {string} analysisType - 分析类型（可选，默认为evaluate）
    * @param {Function} onData - 数据回调函数
    * @param {AbortSignal} signal - 取消信号（可选）
    * @param {string} conversationId - 对话ID（可选）
@@ -123,14 +122,12 @@ class ApiClient {
    */
   async chat(
     question,
-    analysisType = "evaluate",
     onData,
     signal = null,
     conversationId = null
   ) {
     try {
       const requestBody = {
-        analysis_type: analysisType,
         question,
       };
 
@@ -161,13 +158,12 @@ class ApiClient {
    */
   async analyzeStream(data, onData, signal = null, userId = null) {
     try {
-      const { analysis_type, question, file, conversation_id } = data;
+      const { question, file, conversation_id } = data;
 
       if (file) {
         // 文件上传模式
         const formData = new FormData();
         formData.append("file", file);
-        formData.append("analysis_type", analysis_type);
         if (question) {
           formData.append("question", question);
         }
@@ -196,7 +192,6 @@ class ApiClient {
       } else {
         // 纯文本模式
         const requestBody = {
-          analysis_type,
           question,
         };
 
@@ -695,14 +690,21 @@ class ApiClient {
     file = null,
     userId = null
   ) {
+    let finalMessage = message;
+    if (analysisType === "evaluate") {
+      finalMessage = "现在使用 evaluate 模式, " + message;
+    } else if (analysisType === "generate") {
+      finalMessage = "现在使用 generate 模式, " + message;
+    } else if (analysisType === "mock") {
+      finalMessage = "现在使用 mock 模式, " + message;
+    }
     try {
       if (file) {
         // 文件上传模式
         const fileId = await this.uploadFile(file);
         const requestBody = {
           file_id: fileId,
-          analysis_type: analysisType,
-          question: message,
+          question: finalMessage,
         };
 
         if (conversationId) {
@@ -731,8 +733,7 @@ class ApiClient {
       } else {
         // 纯文本模式
         const requestBody = {
-          analysis_type: analysisType,
-          question: message,
+          question: finalMessage,
         };
 
         // 只有在 conversationId 存在时才加到请求体
