@@ -9,6 +9,7 @@ class ApiClient {
   constructor() {
     this.baseURL = clientConfig.server.API_BASE_URL;
     this.apiKey = clientConfig.coze.API_KEY;
+    console.log("APIKey", this.apiKey);
   }
 
   /**
@@ -149,20 +150,12 @@ class ApiClient {
    * @param {Object} data - 分析数据
    * @param {Function} onData - 数据回调函数
    * @param {AbortSignal} signal - 取消信号（可选）
-   * @param {string} userId - 用户ID（用于OAuth JWT认证和会话隔离）
+   * @param {string} userId - 用户ID（可选）
    * @returns {Promise<Object>} 流式响应处理结果
    */
   async analyzeStream(data, onData, signal = null, userId = null) {
     try {
       const { analysis_type, question, file, conversation_id } = data;
-
-      // 创建会话名称用于会话隔离
-      const sessionName =
-        conversation_id && userId
-          ? `user_${userId}_conv_${conversation_id}`
-          : userId
-            ? `user_${userId}`
-            : null;
 
       if (file) {
         // 文件上传模式
@@ -177,9 +170,6 @@ class ApiClient {
         }
         if (userId) {
           formData.append("user_id", userId);
-        }
-        if (sessionName) {
-          formData.append("session_name", sessionName);
         }
 
         const response = await this.request(
@@ -210,10 +200,6 @@ class ApiClient {
 
         if (userId) {
           requestBody.user_id = userId;
-        }
-
-        if (sessionName) {
-          requestBody.session_name = sessionName;
         }
 
         const response = await this.request(
@@ -444,41 +430,21 @@ class ApiClient {
   }
 
   /**
-   * 获取对话详情
-   * @param {string} conversationId - 对话ID
-   * @returns {Promise<Object>} 对话详情
-   */
-  async getConversationDetail(conversationId) {
-    const response = await this.request(`/api/conversations/retrieve`, {
-      method: "GET",
-      params: {
-        conversation_id: conversationId,
-      },
-    });
-    const data = await response.json();
-    return data.data;
-  }
-
-  /**
    * 获取用户的对话列表
    * @param {string} userId - 用户ID
    * @param {Object} options - 查询选项
    * @param {number} options.limit - 限制返回的对话数量
    * @param {string} options.order - 排序方式 (asc/desc)
-   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<Array>} 对话列表
    */
-  async getUserConversationIds(userId, options = {}, sessionName = null) {
+  async getUserConversations(userId, options = {}) {
     try {
-      console.log("获取用户对话列表:", { userId, options, sessionName });
-
-      // 如果没有提供sessionName，创建默认的会话名称
-      const finalSessionName = sessionName || `user_${userId}`;
+      console.log("获取用户对话列表:", { userId, options });
 
       const requestBody = {
+        limit: options.limit || 20,
         order: options.order || "desc",
         user_id: userId,
-        session_name: finalSessionName,
       };
 
       const response = await this.request("/api/conversations", {
@@ -489,7 +455,18 @@ class ApiClient {
       const data = await response.json();
       console.log("用户对话列表获取成功:", data);
 
-      return data.data.conversations.map((conv) => conv.id);
+      // 转换对话格式以适配前端
+      const conversations =
+        data.data?.map((conv) => ({
+          id: conv.conversation_id,
+          title: conv.title || `对话 ${conv.conversation_id.slice(-6)}`,
+          createdAt: new Date(conv.created_at * 1000).toISOString(),
+          updatedAt: new Date(conv.updated_at * 1000).toISOString(),
+          messageCount: conv.message_count || 0,
+          status: conv.status || "active",
+        })) || [];
+
+      return conversations;
     } catch (error) {
       console.error("获取用户对话列表失败:", error);
       throw error;
@@ -504,36 +481,17 @@ class ApiClient {
    * @param {string} options.order - 排序方式 (asc/desc)
    * @param {string} options.chatId - 聊天ID
    * @param {string} options.beforeId - 在指定ID之前的消息
-   * @param {string} userId - 用户ID（用于OAuth JWT认证）
-   * @param {string} sessionName - 会话名称（用于会话隔离）
    * @returns {Promise<Object>} 消息列表和分页信息
    */
-  async getConversationMessages(
-    conversationId,
-    options = {},
-    userId = null,
-    sessionName = null
-  ) {
+  async getConversationMessages(conversationId, options = {}) {
     try {
-      console.log("获取对话消息:", {
-        conversationId,
-        options,
-        userId,
-        sessionName,
-      });
-
-      // 如果有userId但没有sessionName，创建默认的会话名称
-      const finalSessionName =
-        sessionName ||
-        (userId ? `user_${userId}_conv_${conversationId}` : null);
+      console.log("获取对话消息:", { conversationId, options });
 
       const requestBody = {
         limit: options.limit || null,
         order: options.order || "asc",
         ...(options.chatId && { chat_id: options.chatId }),
         ...(options.beforeId && { before_id: options.beforeId }),
-        ...(userId && { user_id: userId }),
-        ...(finalSessionName && { session_name: finalSessionName }),
       };
 
       const response = await this.request(
@@ -719,7 +677,7 @@ class ApiClient {
    * @param {Function} onData - 数据回调函数
    * @param {AbortSignal} signal - 取消信号
    * @param {File} file - 可选的文件对象
-   * @param {string} userId - 用户ID（用于OAuth JWT认证和会话隔离）
+   * @param {string} userId - 用户ID（可选）
    * @returns {Promise<Object>} 流式响应处理结果
    */
   async sendMessageToConversation(
@@ -732,14 +690,6 @@ class ApiClient {
     userId = null
   ) {
     try {
-      // 创建会话名称用于会话隔离
-      const sessionName =
-        conversationId && userId
-          ? `user_${userId}_conv_${conversationId}`
-          : userId
-            ? `user_${userId}`
-            : null;
-
       if (file) {
         // 文件上传模式
         const fileId = await this.uploadFile(file);
@@ -755,10 +705,6 @@ class ApiClient {
 
         if (userId) {
           requestBody.user_id = userId;
-        }
-
-        if (sessionName) {
-          requestBody.session_name = sessionName;
         }
 
         const response = await this.request(
@@ -790,10 +736,6 @@ class ApiClient {
 
         if (userId) {
           requestBody.user_id = userId;
-        }
-
-        if (sessionName) {
-          requestBody.session_name = sessionName;
         }
 
         const response = await this.request(
