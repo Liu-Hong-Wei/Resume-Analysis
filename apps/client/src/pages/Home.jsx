@@ -30,7 +30,7 @@ function Home() {
       <div className="hero min-h-[50vh] rounded-2xl bg-gradient-to-tl from-primary/90 to-secondary/90">
         <div className="hero-content text-center text-neutral-content">
           <div className="max-w-lg">
-            <h1 className="mb-5 text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-tr from-accent to-primary">
+            <h1 className="mb-5 text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-l from-accent to-primary">
               智简对话
             </h1>
             <h3 className="mb-5 text-3xl font-bold">你的简历分析助手</h3>
