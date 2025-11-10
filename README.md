@@ -1,57 +1,52 @@
-# 简历分析服务 v2.0
+# 简历分析系统
 
-一个基于 Express.js 的现代化简历分析服务，采用面向对象的设计模式，参考 Coze JS 官方示例的最佳实践。服务集成了 Coze API 进行智能分析，提供简历评估、简历生成和模拟面试功能。
+一个基于AI的智能简历分析平台，支持简历评估、简历生成和模拟面试功能。
 
-## 🚀 新版本特性
+## 🚀 功能特性
 
-### v2.0.0 主要改进
+### 核心功能
 
-- 🏗️ **面向对象架构**: 重构为类基础的设计模式
-- 🔧 **统一配置管理**: ConfigManager 统一管理所有配置项
-- 🚀 **改进的服务器启动**: 优雅启动和关闭流程
-- 📊 **更好的错误处理**: 统一的错误处理机制
-- 🔄 **向后兼容**: 保持旧版本 API 的兼容性
-- 📚 **完善文档**: 详细的技术文档和使用示例
+- **简历评估** - 智能分析简历内容，提供专业建议和改进意见
+- **简历生成** - 基于用户信息自动生成优化的简历内容
+- **模拟面试** - AI驱动的面试模拟，提供真实的面试体验
+- **多格式支持** - 支持PDF、Word文档等多种简历格式
+- **实时对话** - 流式响应，提供流畅的交互体验
 
-## 🏗️ 架构设计
+### 技术特性
 
-### 核心组件
-
-- **ConfigManager**: 配置管理类，统一管理所有配置项
-- **CozeClient**: Coze API 客户端类，封装所有 API 调用
-- **AnalysisService**: 分析服务类，处理业务逻辑
-- **RouteManager**: 路由管理类，统一管理 API 路由
-- **Server**: 服务器应用类，管理整个应用生命周期
-
-### 设计原则
-
-- **面向对象**: 使用类封装相关功能
-- **单一职责**: 每个类只负责特定功能
-- **依赖注入**: 通过构造函数注入依赖
-- **错误处理**: 统一的错误处理机制
-- **向后兼容**: 保持旧版本 API 的兼容性
-
-## 📋 功能特性
-
-### 分析类型
-
-- **简历评估**: 分析简历内容，提供改进建议
-- **简历生成**: 根据用户需求生成简历内容
-- **模拟面试**: 基于简历进行模拟面试
-
-### 支持格式
-
-- **文件上传**: PDF, JPEG, PNG, GIF (最大 20MB)
-- **文本分析**: 纯文本内容分析
-- **流式响应**: Server-Sent Events (SSE) 支持
+- **用户认证** - 基于Clerk的安全用户认证系统
+- **响应式设计** - 支持桌面端和移动端的现代化UI
+- **实时聊天** - 支持流式响应的对话界面
+- **文件管理** - 安全的文件上传和处理系统
+- **错误处理** - 完善的错误处理和用户提示
 
 ## 🛠️ 技术栈
 
-- **后端**: Node.js, Express.js
-- **AI 服务**: Coze API
-- **文件处理**: Multer, FormData
-- **流式响应**: Server-Sent Events
-- **配置管理**: dotenv
+### 前端 (Client)
+
+- **React 19** - 现代化的React框架
+- **Vite** - 快速的构建工具
+- **Tailwind CSS** - 实用优先的CSS框架
+- **DaisyUI** - Tailwind CSS组件库
+- **React Router** - 客户端路由
+- **Clerk** - 用户认证服务
+- **React Markdown** - Markdown渲染
+
+### 后端 (Server)
+
+- **Node.js** - JavaScript运行时
+- **Express.js** - Web应用框架
+- **Prisma** - 数据库ORM
+- **Multer** - 文件上传中间件
+- **PDF-Parse** - PDF文档解析
+- **Mammoth** - Word文档解析
+- **CORS** - 跨域资源共享
+
+### 开发工具
+
+- **pnpm** - 包管理器
+- **ESLint** - 代码质量检查
+- **Concurrently** - 并发运行脚本
 
 ## 📦 项目结构
 
@@ -60,21 +55,20 @@ resume-analysis/
 ├── apps/
 │   ├── client/                 # 前端应用
 │   │   ├── src/
-│   │   │   ├── services/
-│   │   │   │   └── apiService.js    # 现代化 API 客户端
-│   │   │   └── ...
-│   │   └── ...
-│   └── server/                 # 后端服务
-│       ├── config/
-│       │   └── index.js        # 配置管理类
-│       ├── services/
-│       │   ├── cozeService.js  # Coze API 客户端类
-│       │   └── analysisService.js # 分析服务类
-│       ├── routes/
-│       │   └── unified-analysis.js # 路由管理类
-│       ├── index.js            # 服务器应用类
-│       └── API_DOCUMENTATION.md # 详细 API 文档
-└── ...
+│   │   │   ├── components/     # React组件
+│   │   │   ├── pages/         # 页面组件
+│   │   │   ├── hooks/         # 自定义Hooks
+│   │   │   ├── services/      # API服务
+│   │   │   └── Layout/        # 布局组件
+│   │   └── public/            # 静态资源
+│   └── server/                # 后端应用
+│       ├── routes/            # API路由
+│       ├── services/          # 业务服务
+│       ├── middleware/        # 中间件
+│       ├── config/           # 配置文件
+│       └── utils/            # 工具函数
+├── package.json              # 根包配置
+└── pnpm-workspace.yaml      # pnpm工作区配置
 ```
 
 ## 🚀 快速开始
@@ -82,169 +76,138 @@ resume-analysis/
 ### 环境要求
 
 - Node.js 18+
-- pnpm (推荐) 或 npm
+- pnpm 8+
 
 ### 安装依赖
 
 ```bash
-# 安装 pnpm (如果未安装)
-npm install -g pnpm
+# 克隆项目
+git clone <repository-url>
+cd resume-analysis
 
-# 安装项目依赖
+# 安装依赖
 pnpm install
 ```
 
 ### 环境配置
 
-创建 `.env` 文件：
+1. **前端配置** (apps/client/.env)
 
-```bash
-# Coze API 配置 (必需)
+```env
+VITE_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
+VITE_API_BASE_URL=http://localhost:3001
+```
+
+2. **后端配置** (apps/server/.env)
+
+```env
+NODE_ENV=development
+PORT=3001
+CORS_ORIGIN=http://localhost:5173
 COZE_API_KEY=your_coze_api_key
 COZE_BOT_ID=your_coze_bot_id
-
-# 服务器配置 (可选)
-PORT=3001
-NODE_ENV=development
-CORS_ORIGIN=*
+DATABASE_URL=your_database_url
 ```
 
-### 启动服务
+### 启动开发服务器
 
 ```bash
-# 启动后端服务
-pnpm dev:server
-
-# 启动前端应用
-pnpm dev:client
-
-# 同时启动前后端
+# 同时启动前端和后端
 pnpm dev
+
+# 或者分别启动
+pnpm dev:client  # 前端 (http://localhost:5173)
+pnpm dev:server  # 后端 (http://localhost:3001)
 ```
 
-## 📋 API 使用
+## 📖 使用指南
 
-### 基础端点
+### 1. 用户注册/登录
 
-- `GET /health` - 健康检查
-- `GET /api/analysis-types` - 获取分析类型
-- `POST /api/analyze` - 通用分析 API
-- `POST /api/analyze-stream` - 通用分析 API (流式)
+- 访问应用首页，点击登录按钮
+- 使用Clerk提供的认证服务完成注册/登录
 
-### 客户端使用示例
+### 2. 简历分析
 
-```javascript
-import { apiClient, analysisService } from "./services/apiService.js";
+- 在分析页面选择分析类型（简历评估/简历生成/模拟面试）
+- 上传简历文件（支持PDF、Word格式）
+- 开始与AI进行对话，获取专业的分析和建议
 
-// 使用通用 API 客户端
-const result = await apiClient.analyze({
-  analysis_type: "evaluate",
-  question: "请分析我的简历",
-  file: fileObject,
-});
+### 3. 对话管理
 
-// 使用特定分析服务
-const evaluation = await analysisService.evaluateResume(
-  fileObject,
-  "请分析我的简历"
-);
-
-// 流式分析
-await analysisService.evaluateResumeStream(
-  fileObject,
-  "请分析我的简历",
-  (data) => {
-    if (data.type === "content") {
-      console.log("收到内容:", data.content);
-    } else if (data.type === "end") {
-      console.log("分析完成");
-    }
-  }
-);
-```
+- 查看历史对话记录
+- 切换不同的对话会话
+- 删除不需要的对话
 
 ## 🔧 开发指南
 
-### 新架构优势
+### 代码规范
 
-1. **更好的可维护性**: 类封装使代码结构更清晰
-2. **统一的错误处理**: 所有组件使用相同的错误处理机制
-3. **配置集中管理**: 所有配置项统一管理
-4. **优雅的启动流程**: 支持优雅启动和关闭
-5. **向后兼容**: 保持旧版本 API 的兼容性
+- 使用ESLint进行代码质量检查
+- 遵循React Hooks最佳实践
+- 使用TypeScript进行类型检查（可选）
 
-### 扩展新功能
+### 添加新功能
 
-1. **添加新的分析类型**:
+1. 在`apps/server/routes/`中添加新的API路由
+2. 在`apps/client/src/components/`中创建新的React组件
+3. 更新相关的类型定义和文档
 
-   ```javascript
-   // 在 config/index.js 中添加新类型
-   analysisTypes: {
-     EVALUATE: "evaluate",
-     GENERATE: "generate",
-     MOCK: "mock",
-     NEW_TYPE: "new_type" // 新增
-   }
-   ```
+### 测试
 
-2. **创建新的服务方法**:
+```bash
+# 运行前端测试
+cd apps/client && pnpm test
 
-   ```javascript
-   // 在 services/analysisService.js 中添加
-   async handleNewAnalysis(data) {
-     // 实现新分析逻辑
-   }
-   ```
+# 运行后端测试
+cd apps/server && pnpm test
+```
 
-3. **注册新的路由**:
-   ```javascript
-   // 在 routes/unified-analysis.js 中添加
-   // 路由会自动注册
-   ```
+## 🚀 部署
 
-## 📚 文档
+### 构建生产版本
 
-- [API 文档](./apps/server/API_DOCUMENTATION.md) - 详细的 API 使用说明
-- [架构设计](./docs/architecture.md) - 系统架构设计文档
-- [开发指南](./docs/development.md) - 开发指南和最佳实践
+```bash
+# 构建前端
+cd apps/client && pnpm build
 
-## 🤝 贡献
+# 构建后端
+cd apps/server && pnpm build
+```
 
-1. Fork 项目
+### 环境变量
+
+确保在生产环境中正确配置所有必需的环境变量：
+
+- `COZE_API_KEY` - Coze API密钥
+- `COZE_BOT_ID` - Coze机器人ID
+- `DATABASE_URL` - 数据库连接URL
+- `CLERK_SECRET_KEY` - Clerk密钥
+
+## 🤝 贡献指南
+
+1. Fork项目
 2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
 3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
 4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
+5. 打开Pull Request
 
 ## 📄 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
-
-## 🔄 更新日志
-
-### v2.0.0 (2024-01-01)
-
-- 🏗️ 重构为面向对象架构
-- 🔧 引入配置管理类
-- 🚀 改进的服务器启动流程
-- 📊 更好的错误处理和日志记录
-- 🔄 保持向后兼容性
-- 📚 完善的技术文档
-
-### v1.x.x
-
-- 基础功能实现
-- 简单的函数式架构
-- 基本的错误处理
+本项目采用 ISC 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情
 
 ## 📞 支持
 
-如有问题或建议，请：
+如果您遇到任何问题或有建议，请：
 
-1. 查看 [API 文档](./apps/server/API_DOCUMENTATION.md)
-2. 搜索 [Issues](../../issues)
-3. 创建新的 Issue
+- 提交Issue到GitHub仓库
+- 联系开发团队
 
----
+## 🔄 更新日志
 
-**注意**: 本项目需要有效的 Coze API 密钥才能正常运行。请确保在 `.env` 文件中正确配置了 `COZE_API_KEY` 和 `COZE_BOT_ID`。
+### v1.0.0
+
+- 初始版本发布
+- 支持简历评估、生成和模拟面试
+- 集成Clerk用户认证
+- 实现流式对话响应
